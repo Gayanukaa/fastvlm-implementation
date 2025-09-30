@@ -59,6 +59,12 @@ python predict.py --model-path /path/to/checkpoint-dir \
                   --image-file /path/to/image.png \
                   --prompt "Describe the image."
 ```
+For example:
+```bash
+python predict.py --model-path checkpoints/llava-fastvithd_0.5b_stage3 \
+                  --image-file images/wonders.png \
+                  --prompt "Describe the image."
+```
 
 ### Inference on Apple Silicon
 To run inference on Apple Silicon, pytorch checkpoints have to be exported to format 
@@ -92,3 +98,5 @@ Our codebase is built using multiple opensource contributions, please see [ACKNO
 ## License
 Please check out the repository [LICENSE](LICENSE) before using the provided code and
 [LICENSE_MODEL](LICENSE_MODEL) for the released models.
+
+

@@ -25,10 +25,15 @@ def predict(args):
         os.rename(os.path.join(model_path, 'generation_config.json'),
                   generation_config)
 
+    if torch.cuda.is_available():
+        device = "cuda"
+    else:
+        device = "cpu"
+
     # Load model
     disable_torch_init()
     model_name = get_model_name_from_path(model_path)
-    tokenizer, model, image_processor, context_len = load_pretrained_model(model_path, args.model_base, model_name, device="mps")
+    tokenizer, model, image_processor, context_len = load_pretrained_model(model_path, args.model_base, model_name, device=device)
 
     # Construct prompt
     qs = args.prompt
@@ -45,7 +50,7 @@ def predict(args):
     model.generation_config.pad_token_id = tokenizer.pad_token_id
 
     # Tokenize prompt
-    input_ids = tokenizer_image_token(prompt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(0).to(torch.device("mps"))
+    input_ids = tokenizer_image_token(prompt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(0).to(device=device)
 
     # Load and preprocess image
     image = Image.open(args.image_file).convert('RGB')
