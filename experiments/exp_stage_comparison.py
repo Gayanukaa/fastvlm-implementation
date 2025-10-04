@@ -296,7 +296,7 @@ def run_stage_comparison_experiment(stage2_path: str, stage3_path: str, image_fo
                     print(f"    ✅ TTFT: {avg_result['ttft_ms']:.1f}ms")
 
         # Clean up model before loading next stage
-        del model, tokenizer, processor
+        del model, tokenizer, image_processor
         gc.collect()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()

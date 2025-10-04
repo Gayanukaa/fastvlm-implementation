@@ -21,12 +21,6 @@ pip install -r requirements.txt
 
 ### 2. Run All Experiments
 
-**Windows:**
-
-```cmd
-run_all_experiments.bat
-```
-
 **Linux/Mac:**
 
 ```bash
@@ -37,10 +31,10 @@ run_all_experiments.bat
 
 ```bash
 # Linux/Mac
-./run_all_experiments.sh ./checkpoints/stage2 ./checkpoints/stage3 ./images cuda
+./run_all_experiments.sh ../checkpoints/stage2 ../checkpoints/stage3 ../images cuda
 
 # Windows
-run_all_experiments.bat .\checkpoints\stage2 .\checkpoints\stage3 .\images cuda
+run_all_experiments.bat ..\checkpoints\stage2 ..\checkpoints\stage3 ..\images cuda
 ```
 
 ## 📊 Individual Experiments
@@ -49,8 +43,8 @@ run_all_experiments.bat .\checkpoints\stage2 .\checkpoints\stage3 .\images cuda
 
 ```bash
 python exp_resolution_scaling.py \
-    --model-path ./checkpoints/llava-fastvithd_0.5b_stage3 \
-    --image-folder ./images \
+    --model-path ../checkpoints/llava-fastvithd_0.5b_stage3 \
+    --image-folder ../images \
     --device cuda
 ```
 
@@ -64,8 +58,8 @@ python exp_resolution_scaling.py \
 
 ```bash
 python exp_token_budget_ablation.py \
-    --model-path ./checkpoints/llava-fastvithd_0.5b_stage3 \
-    --image-folder ./images \
+    --model-path ../checkpoints/llava-fastvithd_0.5b_stage3 \
+    --image-folder ../images \
     --device cuda
 ```
 
@@ -79,9 +73,9 @@ python exp_token_budget_ablation.py \
 
 ```bash
 python exp_stage_comparison.py \
-    --stage2-path ./checkpoints/llava-fastvithd_0.5b_stage2 \
-    --stage3-path ./checkpoints/llava-fastvithd_0.5b_stage3 \
-    --image-folder ./images \
+    --stage2-path ../checkpoints/llava-fastvithd_0.5b_stage2 \
+    --stage3-path ../checkpoints/llava-fastvithd_0.5b_stage3 \
+    --image-folder ../images \
     --device cuda
 ```
 
@@ -95,8 +89,8 @@ python exp_stage_comparison.py \
 
 ```bash
 python exp_prompt_length_effect.py \
-    --model-path ./checkpoints/llava-fastvithd_0.5b_stage3 \
-    --image-folder ./images \
+    --model-path ../checkpoints/llava-fastvithd_0.5b_stage3 \
+    --image-folder ../images \
     --device cuda
 ```
 
@@ -200,35 +194,6 @@ The scripts are optimized for RTX 4070 8GB:
 - **Scatter plots**: Correlation analysis
 - **Heatmaps**: Multi-dimensional comparisons
 
-## 🐛 Troubleshooting
-
-### CUDA Out of Memory
-
-```bash
-# Reduce batch size or image resolution
-python exp_resolution_scaling.py --batch-size 1
-```
-
-### Model Loading Issues
-
-```bash
-# Check model path and trust_remote_code
-python -c "from transformers import AutoTokenizer; AutoTokenizer.from_pretrained('path', trust_remote_code=True)"
-```
-
-### Missing Dependencies
-
-```bash
-pip install --upgrade transformers torch
-```
-
-### NLTK Download Issues
-
-```python
-import nltk
-nltk.download('punkt')
-```
-
 ## 📈 Expected Results
 
 Based on FastVLM paper findings:
@@ -256,30 +221,7 @@ The experiments are designed to reproduce key findings from FastVLM CVPR 2025:
 3. Save results to `results/` directory
 4. Add to runner scripts
 
-### Custom Prompts
-
-```python
-# In any experiment script
-test_prompts = [
-    "Your custom prompt here",
-    "Another prompt for testing"
-]
-```
-
-### Custom Metrics
-
-```python
-# Add to measure_inference function
-custom_metric = calculate_your_metric(outputs)
-return {
-    'existing_metrics': ...,
-    'custom_metric': custom_metric
-}
-```
-
 ## 🏆 Citation
-
-If you use these experiments in your research, please cite:
 
 ```bibtex
 @inproceedings{fastvlm2025,
@@ -289,19 +231,3 @@ If you use these experiments in your research, please cite:
   year={2025}
 }
 ```
-
-## 📞 Support
-
-For issues or questions:
-
-1. Check the troubleshooting section
-2. Verify your model checkpoints are compatible
-3. Ensure all dependencies are installed
-4. Check CUDA/GPU setup
-
-## 🔄 Updates
-
-- **v1.0**: Initial implementation with all 4 experiments
-- Supports both Windows and Linux
-- Optimized for RTX 4070 8GB VRAM
-- Comprehensive plotting and analysis
