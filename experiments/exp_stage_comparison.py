@@ -14,7 +14,13 @@ import torch
 import torch.cuda
 from PIL import Image
 import numpy as np
-from transformers import AutoTokenizer, AutoModelForCausalLM, AutoProcessor
+from transformers import AutoTokenizer
+
+# LLaVA imports for custom model loading
+from llava.model.builder import load_pretrained_model
+from llava.conversation import conv_templates, SeparatorStyle
+from llava.mm_utils import tokenizer_image_token, process_images, IMAGE_TOKEN_INDEX
+from llava.constants import DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN
 from tqdm import tqdm
 import warnings
 from nltk.translate.bleu_score import sentence_bleu
@@ -33,32 +39,24 @@ except LookupError:
 from utils_plot import save_grouped_bar, save_plot
 
 def setup_model_and_tokenizer(model_path: str, device: str) -> Tuple:
-    """Load model and tokenizer with optimizations for 8GB VRAM."""
+    """Load model and tokenizer using LLaVA's approach for FastVLM."""
     print(f"🔧 Loading model from {model_path}...")
 
-    # Load tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
-
-    # Load model with memory optimizations
-    model = AutoModelForCausalLM.from_pretrained(
-        model_path,
-        torch_dtype=torch.float16,
+    # Use LLaVA's load_pretrained_model for FastVLM compatibility
+    tokenizer, model, image_processor, context_len = load_pretrained_model(
+        model_path=model_path,
+        model_base=None,
+        model_name="llava_qwen",
+        load_8bit=False,
+        load_4bit=False,
         device_map="auto",
-        trust_remote_code=True,
-        low_cpu_mem_usage=True,
-        use_cache=True,
+        device=device
     )
-
-    # Try to load processor if available
-    try:
-        processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True)
-    except:
-        processor = None
-        print("⚠️  No processor found, using tokenizer only")
 
     model.eval()
     print(f"✅ Model loaded on {device}")
-    return model, tokenizer, processor
+    print(f"📏 Context length: {context_len}")
+    return model, tokenizer, image_processor
 
 def preprocess_image(image_path: str, target_size: int = 512) -> Image.Image:
     """Preprocess image to standard size."""
@@ -99,7 +97,7 @@ def calculate_bleu_score(reference: str, candidate: str) -> float:
     except:
         return 0.0
 
-def measure_inference(model, tokenizer, processor, image: Image.Image,
+def measure_inference(model, tokenizer, image_processor, image: Image.Image,
                      prompt: str, device: str, max_tokens: int = 100) -> Dict:
     """Measure inference metrics."""
 
@@ -107,11 +105,23 @@ def measure_inference(model, tokenizer, processor, image: Image.Image,
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
-    # Prepare input
-    if processor:
-        inputs = processor(text=prompt, images=image, return_tensors="pt").to(device)
+    # Prepare input using LLaVA's approach
+    qs = prompt
+    if model.config.mm_use_im_start_end:
+        qs = DEFAULT_IM_START_TOKEN + DEFAULT_IMAGE_TOKEN + DEFAULT_IM_END_TOKEN + '\n' + qs
     else:
-        inputs = tokenizer(prompt, return_tensors="pt").to(device)
+        qs = DEFAULT_IMAGE_TOKEN + '\n' + qs
+
+    conv = conv_templates['qwen_2'].copy()  # Use qwen_2 template for qwen2 models
+    conv.append_message(conv.roles[0], qs)
+    conv.append_message(conv.roles[1], None)
+    prompt_formatted = conv.get_prompt()
+
+    # Tokenize prompt
+    input_ids = tokenizer_image_token(prompt_formatted, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(0).to(device=device)
+
+    # Process image
+    image_tensor = process_images([image], image_processor, model.config)[0]
 
     # CUDA events for precise timing
     if torch.cuda.is_available():
@@ -128,7 +138,8 @@ def measure_inference(model, tokenizer, processor, image: Image.Image,
 
         # Generate first token for TTFT
         first_output = model.generate(
-            **inputs,
+            input_ids,
+            images=image_tensor.unsqueeze(0).to(device=device, dtype=torch.float16),
             max_new_tokens=1,
             do_sample=False,
             pad_token_id=tokenizer.eos_token_id,
@@ -142,7 +153,8 @@ def measure_inference(model, tokenizer, processor, image: Image.Image,
 
         # Generate full response
         outputs = model.generate(
-            **inputs,
+            input_ids,
+            images=image_tensor.unsqueeze(0).to(device=device, dtype=torch.float16),
             max_new_tokens=max_tokens,
             do_sample=False,
             temperature=0.7,
@@ -175,7 +187,7 @@ def measure_inference(model, tokenizer, processor, image: Image.Image,
         generated_text = generated_text.replace(prompt, "").strip()
 
     # Count tokens
-    input_tokens = len(inputs['input_ids'][0]) if 'input_ids' in inputs else 0
+    input_tokens = len(input_ids[0])
     output_tokens = len(outputs[0]) - input_tokens
 
     return {
@@ -231,7 +243,7 @@ def run_stage_comparison_experiment(stage2_path: str, stage3_path: str, image_fo
         print(f"\n🔄 Testing {stage_name}: {model_path}")
 
         # Load model
-        model, tokenizer, processor = setup_model_and_tokenizer(model_path, device)
+        model, tokenizer, image_processor = setup_model_and_tokenizer(model_path, device)
         stage_outputs[stage_name] = {}
 
         # Test on all image-prompt combinations
@@ -250,7 +262,7 @@ def run_stage_comparison_experiment(stage2_path: str, stage3_path: str, image_fo
                 for run in range(2):  # 2 runs per combination to save time
                     try:
                         metrics = measure_inference(
-                            model, tokenizer, processor, image, prompt, device
+                            model, tokenizer, image_processor, image, prompt, device
                         )
                         run_results.append(metrics)
 
