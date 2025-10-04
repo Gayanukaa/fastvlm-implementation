@@ -2,7 +2,7 @@
 
 This folder contains standalone scripts to reproduce and visualize FastVLM ablation experiments from the CVPR 2025 paper, optimized for RTX 4070 8GB GPU.
 
-## 🎯 Experiments Overview
+## Experiments Overview
 
 | Experiment                | Script                         | Purpose                                | Outputs                     |
 | ------------------------- | ------------------------------ | -------------------------------------- | --------------------------- |
@@ -11,7 +11,7 @@ This folder contains standalone scripts to reproduce and visualize FastVLM ablat
 | **Stage Comparison**      | `exp_stage_comparison.py`      | Compare Stage-2 vs Stage-3 models      | BLEU similarity analysis    |
 | **Prompt Length Effect**  | `exp_prompt_length_effect.py`  | Test prompts [5, 20, 60] words         | Latency vs Prompt Length    |
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Install Dependencies
 
@@ -37,7 +37,7 @@ pip install -r requirements.txt
 run_all_experiments.bat ..\checkpoints\stage2 ..\checkpoints\stage3 ..\images cuda
 ```
 
-## 📊 Individual Experiments
+## Individual Experiments
 
 ### Resolution Scaling
 
@@ -100,36 +100,7 @@ python exp_prompt_length_effect.py \
 - `results/plots/prompt_length_vs_latency.png`
 - `results/plots/prompt_length_dual_axis.png`
 
-## 📁 File Structure
-
-```
-experiments/
-├── exp_resolution_scaling.py      # Resolution scaling experiment
-├── exp_token_budget_ablation.py   # Token budget experiment
-├── exp_stage_comparison.py        # Stage 2 vs 3 comparison
-├── exp_prompt_length_effect.py    # Prompt length analysis
-├── utils_plot.py                  # Plotting utilities
-├── requirements.txt               # Python dependencies
-├── run_all_experiments.sh         # Linux/Mac runner
-├── run_all_experiments.bat        # Windows runner
-└── README.md                      # This file
-
-results/
-├── resolution_scaling.csv         # Resolution experiment data
-├── token_budget.csv              # Token budget experiment data
-├── stage_compare.csv             # Stage comparison data
-├── prompt_length.csv             # Prompt length experiment data
-├── combined.csv                  # All experiments combined
-├── experiment_summary.txt        # Text summary
-└── plots/                        # All generated plots
-    ├── resolution_vs_latency.png
-    ├── resolution_vs_vram.png
-    ├── token_budget_vs_ttft_resize.png
-    ├── stage_comparison_ttft.png
-    └── ...
-```
-
-## ⚙️ Configuration Options
+## Configuration Options
 
 All scripts support these common arguments:
 
@@ -155,7 +126,7 @@ The scripts are optimized for RTX 4070 8GB:
 - **Small batches**: `batch_size=1` to minimize VRAM
 - **Smart loading**: `low_cpu_mem_usage=True`
 
-## 📊 Generated Metrics
+## Generated Metrics
 
 ### Resolution Scaling
 
@@ -186,7 +157,7 @@ The scripts are optimized for RTX 4070 8GB:
 - Short (5), Medium (20), Long (60) word prompts
 - Multiple prompt categories tested
 
-## 🎨 Plot Types Generated
+## Plot Types Generated
 
 - **Line plots**: Trend analysis (resolution vs latency)
 - **Dual-axis plots**: Compare two metrics simultaneously
@@ -194,7 +165,7 @@ The scripts are optimized for RTX 4070 8GB:
 - **Scatter plots**: Correlation analysis
 - **Heatmaps**: Multi-dimensional comparisons
 
-## 📈 Expected Results
+## Expected Results
 
 Based on FastVLM paper findings:
 
@@ -203,7 +174,7 @@ Based on FastVLM paper findings:
 - **Stage Comparison**: Stage 2 faster but less accurate than Stage 3
 - **Prompt Length**: Longer prompts → higher latency, more detailed outputs
 
-## 🎯 Reproducing Paper Results
+## Reproducing Paper Results
 
 The experiments are designed to reproduce key findings from FastVLM CVPR 2025:
 
@@ -212,7 +183,7 @@ The experiments are designed to reproduce key findings from FastVLM CVPR 2025:
 - **Figure 3**: Latency vs accuracy curves
 - **Figure 4**: TTFT measurements
 
-## 📝 Customization
+## Customization
 
 ### Adding New Experiments
 
@@ -221,7 +192,7 @@ The experiments are designed to reproduce key findings from FastVLM CVPR 2025:
 3. Save results to `results/` directory
 4. Add to runner scripts
 
-## 🏆 Citation
+## Citation
 
 ```bibtex
 @inproceedings{fastvlm2025,
