@@ -1,6 +1,6 @@
-# FastVLM Examples
+# FastVLM Video Fine-tuning
 
-This directory contains example scripts and usage demonstrations for FastVLM.
+This directory contains video fine-tuning scripts and usage demonstrations for FastVLM.
 
 ## Video Fine-tuning Example
 
@@ -11,7 +11,7 @@ This script demonstrates how to set up and use FastVLM's video fine-tuning capab
 ### Usage
 
 ```bash
-python examples/video_finetuning_example.py
+python finetune/video_finetuning_example.py
 ```
 
 This will create:
@@ -29,7 +29,7 @@ This will create:
 
 ```bash
 # 1. Run the example generator
-cd examples
+cd finetune
 python video_finetuning_example.py
 
 # 2. Edit the generated training script with your paths
@@ -52,7 +52,7 @@ bash train_video_example.sh
 ## Documentation
 
 For comprehensive documentation, see:
-- `docs/VIDEO_FINETUNING.md` - Complete guide to video fine-tuning
+- `finetune/VIDEO_FINETUNING.md` - Complete guide to video fine-tuning
 
 ## Dataset Format
 

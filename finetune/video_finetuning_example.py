@@ -220,7 +220,7 @@ def print_usage_guide():
 
 7. DOCUMENTATION
    ─────────────
-   See docs/VIDEO_FINETUNING.md for detailed information
+   See finetune/VIDEO_FINETUNING.md for detailed information
 
 8. TOKEN BUDGET EXAMPLE
    ────────────────────
