@@ -20,6 +20,8 @@ model = None
 image_processor = None
 context_len = None
 current_model_name = None
+is_generating_live = False
+last_live_output = ""
 
 MODELS = {
     "Stage 2 (0.5B)": "../checkpoints/llava-fastvithd_0.5b_stage2",
@@ -57,6 +59,72 @@ def load_model_fn(model_choice):
         return f"Successfully loaded {model_choice}"
     except Exception as e:
         return f"Error loading model: {str(e)}"
+
+def live_inference(image, prompt, temperature, top_p):
+    global is_generating_live, last_live_output, model, tokenizer, image_processor
+
+    if image is None:
+        return last_live_output, "⏸️ Waiting for webcam..."
+
+    if model is None:
+        return "⚠️ Model not loaded. Please load a model in the Chat tab.", "❌ Model not loaded"
+
+    # If busy, skip this frame and return previous result
+    if is_generating_live:
+        return last_live_output, "⏳ Processing previous frame..."
+
+    is_generating_live = True
+
+    try:
+        # Prepare prompt
+        qs = prompt
+        if model.config.mm_use_im_start_end:
+            qs = DEFAULT_IM_START_TOKEN + DEFAULT_IMAGE_TOKEN + DEFAULT_IM_END_TOKEN + '\n' + qs
+        else:
+            qs = DEFAULT_IMAGE_TOKEN + '\n' + qs
+
+        from llava.conversation import conv_templates
+        conv_mode = "qwen_2"
+        conv = conv_templates[conv_mode].copy()
+        conv.append_message(conv.roles[0], qs)
+        conv.append_message(conv.roles[1], None)
+        prompt_str = conv.get_prompt()
+
+        # Tokenize
+        start_time = time.time()
+        input_ids = tokenizer_image_token(prompt_str, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(0).to(model.device)
+
+        # Process Image
+        image_tensor = process_images([image], image_processor, model.config)[0]
+
+        # Generate
+        with torch.inference_mode():
+            output_ids = model.generate(
+                inputs=input_ids,
+                images=image_tensor.unsqueeze(0).half(),
+                image_sizes=[image.size],
+                do_sample=True if temperature > 0 else False,
+                temperature=temperature,
+                top_p=top_p,
+                max_new_tokens=128, # Shorter for live video
+                use_cache=True
+            )
+
+        output_text = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0].strip()
+        last_live_output = output_text
+
+        # Calculate processing time
+        processing_time = (time.time() - start_time) * 1000
+        status = f"✅ Processed in {processing_time:.0f}ms"
+
+        return output_text, status
+
+    except Exception as e:
+        print(f"Live inference error: {e}")
+        error_msg = f"Error: {str(e)[:100]}"
+        return error_msg, "❌ Error occurred"
+    finally:
+        is_generating_live = False
 
 def chat(message, history, image, temperature, top_p):
     global tokenizer, model, image_processor
@@ -144,19 +212,36 @@ with gr.Blocks(title="FastVLM Windows Inference") as demo:
             load_btn = gr.Button("Load Model")
             load_status = gr.Textbox(label="Status", interactive=False)
 
-            image_input = gr.Image(type="pil", label="Upload Image")
-
             temperature = gr.Slider(minimum=0.0, maximum=1.0, value=0.2, label="Temperature")
             top_p = gr.Slider(minimum=0.0, maximum=1.0, value=0.7, label="Top P")
 
         with gr.Column(scale=2):
-            chatbot = gr.Chatbot(label="Chat", type="tuples")
-            msg = gr.Textbox(label="Message")
-            clear = gr.Button("Clear")
-            metrics_display = gr.Markdown("**TTFT:** - | **TPS:** -")
+            with gr.Tabs():
+                with gr.Tab("Chat"):
+                    image_input = gr.Image(type="pil", label="Upload Image")
+                    chatbot = gr.Chatbot(label="Chat", type="tuples")
+                    msg = gr.Textbox(label="Message")
+                    clear = gr.Button("Clear")
+                    metrics_display = gr.Markdown("**TTFT:** - | **TPS:** -")
+
+                with gr.Tab("Live Video"):
+                    gr.Markdown("### Real-time Video Inference")
+                    gr.Markdown("💡 **Tip:** The model will continuously analyze webcam frames. Load a model first in the Chat tab.")
+                    live_image_input = gr.Image(sources=["webcam"], streaming=True, type="pil", label="Live Camera")
+                    live_prompt = gr.Textbox(label="Prompt", value="Describe the image in English. Output should be brief, about 15 words or less.")
+                    live_output = gr.Textbox(label="Live Output", lines=3)
+                    live_status = gr.Textbox(label="Status", value="⏸️ Waiting...", interactive=False)
 
     # Event handlers
     load_btn.click(load_model_fn, inputs=[model_dropdown], outputs=[load_status])
+
+    # Live Video Event - triggers on every new frame from webcam
+    live_image_input.stream(
+        live_inference,
+        inputs=[live_image_input, live_prompt, temperature, top_p],
+        outputs=[live_output, live_status],
+        show_progress=False
+    )
 
     def user(user_message, history):
         return "", history + [[user_message, None]]
