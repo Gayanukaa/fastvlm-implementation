@@ -151,9 +151,29 @@ class LlavaMetaForCausalLM(ABC):
         if vision_tower is None or images is None or input_ids.shape[1] == 1:
             return input_ids, position_ids, attention_mask, past_key_values, None, labels
 
+        # Handle video tensors: (B, T, C, H, W) -> flatten to (B*T, C, H, W)
+        is_video = False
+        if isinstance(images, torch.Tensor) and images.ndim == 5:
+            is_video = True
+            batch_size, num_frames, c, h, w = images.shape
+            images = images.view(batch_size * num_frames, c, h, w)
+            # Adjust image_sizes for video frames
+            if image_sizes is not None:
+                # Repeat image size for each frame
+                image_sizes = [img_size for img_size in image_sizes for _ in range(num_frames)]
+        
         if type(images) is list or images.ndim == 5:
             if type(images) is list:
                 images = [x.unsqueeze(0) if x.ndim == 3 else x for x in images]
+                # Handle video frames in list format
+                expanded_images = []
+                for x in images:
+                    if x.ndim == 4:  # (T, C, H, W) - video frames
+                        for frame_idx in range(x.shape[0]):
+                            expanded_images.append(x[frame_idx:frame_idx+1])
+                    else:
+                        expanded_images.append(x)
+                images = expanded_images
             concat_images = torch.cat([image for image in images], dim=0)
             image_features = self.encode_images(concat_images)
             split_sizes = [image.shape[0] for image in images]

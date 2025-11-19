@@ -6,6 +6,7 @@ import base64
 import torch
 import math
 import ast
+import numpy as np
 
 from transformers import StoppingCriteria
 from llava.constants import IMAGE_TOKEN_INDEX
@@ -248,3 +249,52 @@ class KeywordsStoppingCriteria(StoppingCriteria):
         for i in range(output_ids.shape[0]):
             outputs.append(self.call_for_batch(output_ids[i].unsqueeze(0), scores))
         return all(outputs)
+
+
+def load_video_frames(video_path, num_frames=8):
+    """
+    Load frames from a video file uniformly sampled across the video duration.
+    
+    Args:
+        video_path (str): Path to the video file
+        num_frames (int): Number of frames to extract from the video
+        
+    Returns:
+        list: List of PIL.Image objects representing the sampled frames
+    """
+    try:
+        from decord import VideoReader, cpu
+    except ImportError:
+        raise ImportError(
+            "decord is required for video processing. "
+            "Install it with: pip install decord"
+        )
+    
+    vr = VideoReader(video_path, ctx=cpu(0))
+    total_frames = len(vr)
+    
+    if total_frames == 0:
+        raise ValueError(f"Video file {video_path} contains no frames")
+    
+    # Sample N frames uniformly across the video
+    indices = np.linspace(0, total_frames - 1, num_frames, dtype=int)
+    frames = vr.get_batch(indices).asnumpy()  # Shape: (T, H, W, C)
+    
+    # Convert numpy arrays to PIL Images
+    return [Image.fromarray(frame) for frame in frames]
+
+
+def is_video_file(file_path):
+    """
+    Check if a file is a video based on its extension.
+    
+    Args:
+        file_path (str): Path to the file
+        
+    Returns:
+        bool: True if the file is a video, False otherwise
+    """
+    video_extensions = {'.mp4', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.webm', '.m4v'}
+    import os
+    _, ext = os.path.splitext(file_path.lower())
+    return ext in video_extensions
