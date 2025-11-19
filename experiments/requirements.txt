@@ -1,0 +1,24 @@
+# FastVLM Experiments Requirements
+# Core ML libraries
+torch>=2.0.0
+torchvision>=0.15.0
+transformers>=4.35.0
+accelerate>=0.20.0
+
+# Image processing
+Pillow>=9.0.0
+
+# Data and plotting
+numpy>=1.21.0
+pandas>=1.5.0
+matplotlib>=3.5.0
+seaborn>=0.11.0
+
+# NLP evaluation
+nltk>=3.8.0
+
+# Progress bars and utilities
+tqdm>=4.64.0
+
+# CUDA memory optimization (optional)
+# flash-attn>=2.0.0  # Uncomment if you want flash attention support
