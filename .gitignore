@@ -144,5 +144,6 @@ images/
 
 # Files and folders
 results/
+experiments/results/
 videos/
 fastvlm-windows-repro/

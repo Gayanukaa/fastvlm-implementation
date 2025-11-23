@@ -33,9 +33,6 @@ fi
 mkdir -p results
 mkdir -p results/plots
 
-# Change to experiments directory
-cd experiments
-
 echo "🧪 Starting experiments..."
 echo ""
 
@@ -95,9 +92,6 @@ else
     echo "❌ Prompt length effect failed"
 fi
 echo ""
-
-# Go back to root directory
-cd ..
 
 echo "📊 Combining results..."
 

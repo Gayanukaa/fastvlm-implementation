@@ -25,7 +25,7 @@ pip install -r requirements.txt
 
 ```bash
 # Usage: ./run_all_experiments.sh [stage2_path] [stage3_path] [device] [num_samples]
-./run_all_experiments.sh ../checkpoints/stage2 ../checkpoints/stage3 cuda 20
+./run_all_experiments.sh ../checkpoints/llava-fastvithd_0.5b_stage2 ../checkpoints/llava-fastvithd_0.5b_stage3 cuda 20
 ```
 
 ## Individual Experiments
