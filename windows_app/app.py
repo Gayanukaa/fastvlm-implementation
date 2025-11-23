@@ -99,19 +99,39 @@ def live_inference(image, prompt, temperature, top_p):
 
         # Generate
         with torch.inference_mode():
-            output_ids = model.generate(
-                inputs=input_ids,
-                images=image_tensor.unsqueeze(0).half(),
-                image_sizes=[image.size],
-                do_sample=True if temperature > 0 else False,
-                temperature=temperature,
-                top_p=top_p,
-                max_new_tokens=128, # Shorter for live video
-                use_cache=True
-            )
+            # Only use sampling parameters if temperature > 0
+            if temperature > 0:
+                output_ids = model.generate(
+                    inputs=input_ids,
+                    images=image_tensor.unsqueeze(0).half(),
+                    image_sizes=[image.size],
+                    do_sample=True,
+                    temperature=temperature,
+                    top_p=top_p,
+                    max_new_tokens=64,
+                    use_cache=True
+                )
+            else:
+                output_ids = model.generate(
+                    inputs=input_ids,
+                    images=image_tensor.unsqueeze(0).half(),
+                    image_sizes=[image.size],
+                    do_sample=False,
+                    max_new_tokens=64,
+                    use_cache=True
+                )
 
+        # Decode the generated tokens
         output_text = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0].strip()
-        last_live_output = output_text
+
+        # Debug: print to console
+        print(f"Generated text: '{output_text}' (length: {len(output_text)})")
+
+        # Update last output even if empty (to show we processed)
+        if output_text:
+            last_live_output = output_text
+        else:
+            output_text = "[No text generated]"
 
         # Calculate processing time
         processing_time = (time.time() - start_time) * 1000
@@ -161,17 +181,29 @@ def chat(message, history, image, temperature, top_p):
     # Streamer
     streamer = TextIteratorStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
 
-    generation_kwargs = dict(
-        inputs=input_ids,
-        images=image_tensor.unsqueeze(0).half(),
-        image_sizes=[image.size],
-        do_sample=True if temperature > 0 else False,
-        temperature=temperature,
-        top_p=top_p,
-        max_new_tokens=512,
-        streamer=streamer,
-        use_cache=True
-    )
+    # Only use sampling parameters if temperature > 0
+    if temperature > 0:
+        generation_kwargs = dict(
+            inputs=input_ids,
+            images=image_tensor.unsqueeze(0).half(),
+            image_sizes=[image.size],
+            do_sample=True,
+            temperature=temperature,
+            top_p=top_p,
+            max_new_tokens=256,
+            streamer=streamer,
+            use_cache=True
+        )
+    else:
+        generation_kwargs = dict(
+            inputs=input_ids,
+            images=image_tensor.unsqueeze(0).half(),
+            image_sizes=[image.size],
+            do_sample=False,
+            max_new_tokens=256,
+            streamer=streamer,
+            use_cache=True
+        )
 
     # Run generation in a separate thread
     thread = threading.Thread(target=model.generate, kwargs=generation_kwargs)
@@ -212,7 +244,7 @@ with gr.Blocks(title="FastVLM Windows Inference") as demo:
             load_btn = gr.Button("Load Model")
             load_status = gr.Textbox(label="Status", interactive=False)
 
-            temperature = gr.Slider(minimum=0.0, maximum=1.0, value=0.2, label="Temperature")
+            temperature = gr.Slider(minimum=0.0, maximum=1.0, value=0.0, label="Temperature")
             top_p = gr.Slider(minimum=0.0, maximum=1.0, value=0.7, label="Top P")
 
         with gr.Column(scale=2):
