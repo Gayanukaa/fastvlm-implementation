@@ -13,6 +13,7 @@ numpy>=1.21.0
 pandas>=1.5.0
 matplotlib>=3.5.0
 seaborn>=0.11.0
+datasets>=2.14.0
 
 # NLP evaluation
 nltk>=3.8.0

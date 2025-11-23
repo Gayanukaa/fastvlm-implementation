@@ -143,6 +143,6 @@ checkpoints/
 images/
 
 # Files and folders
-experiments/results/
+results/
 videos/
 fastvlm-windows-repro/
