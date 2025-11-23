@@ -146,3 +146,4 @@ if combined_data:
 
 else:
     print("❌ No CSV files found to combine")
+EOF

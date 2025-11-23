@@ -134,6 +134,24 @@ def run_experiment(args):
     print(f"🚀 Loading model: {args.model_path}")
     model, tokenizer, image_processor = setup_model(args.model_path, args.device)
 
+    print("🔥 Warming up GPU...")
+    # Create a dummy image and prompt
+    dummy_image = Image.new('RGB', (512, 512), color='white')
+    dummy_prompt = "Warmup run"
+
+    # Run inference once to initialize CUDA context and buffers
+    try:
+        _ = measure_inference(model, tokenizer, image_processor, dummy_image, dummy_prompt, args.device)
+    except Exception as e:
+        print(f"Warmup warning: {e}")
+
+    # Reset stats so warmup doesn't count toward VRAM peaks
+    if torch.cuda.is_available():
+        torch.cuda.reset_peak_memory_stats()
+        torch.cuda.empty_cache()
+
+    print("✅ Warmup complete. Starting experiment...")
+
     print("📚 Loading TextVQA dataset...")
     dataset = get_benchmark_dataset(
         "textvqa", split="validation", max_samples=args.num_samples
