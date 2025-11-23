@@ -6,61 +6,92 @@ Uses TextVQA questions extended with context prefixes.
 """
 
 import argparse
+import csv
+import gc
 import os
 import sys
 import time
-import csv
-import gc
-import torch
-import numpy as np
-from tqdm import tqdm
-from PIL import Image
 import warnings
+
+import numpy as np
+import torch
+from PIL import Image
+from tqdm import tqdm
 
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from llava.utils import disable_torch_init
-from llava.model.builder import load_pretrained_model
-from llava.mm_utils import tokenizer_image_token, process_images, get_model_name_from_path
-from llava.constants import IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN
-from llava.conversation import conv_templates
-
-# Import utilities
-from utils_plot import save_plot, save_dual_axis_plot
 from utils_dataset import get_benchmark_dataset
 
+# Import utilities
+from utils_plot import save_dual_axis_plot, save_plot
+
+from llava.constants import (
+    DEFAULT_IM_END_TOKEN,
+    DEFAULT_IM_START_TOKEN,
+    DEFAULT_IMAGE_TOKEN,
+    IMAGE_TOKEN_INDEX,
+)
+from llava.conversation import conv_templates
+from llava.mm_utils import (
+    get_model_name_from_path,
+    process_images,
+    tokenizer_image_token,
+)
+from llava.model.builder import load_pretrained_model
+from llava.utils import disable_torch_init
+
 warnings.filterwarnings("ignore")
+
 
 def setup_model(model_path, device):
     disable_torch_init()
     model_name = get_model_name_from_path(model_path)
     tokenizer, model, image_processor, context_len = load_pretrained_model(
-        model_path, None, model_name, device=device, device_map="auto", torch_dtype=torch.float16
+        model_path,
+        None,
+        model_name,
+        device=device,
+        device_map="auto",
+        torch_dtype=torch.float16,
     )
     model.eval()
     return model, tokenizer, image_processor
+
 
 def get_prompt_prefixes():
     return {
         "Short": "",
         "Medium": "Please analyze this image carefully and answer the following question based on the visual details you observe: ",
-        "Long": "As an expert visual assistant capable of detailed image analysis and OCR, please examine this image thoroughly. Pay attention to all text, objects, and context within the scene. Based on your comprehensive understanding of the visual content, please provide a precise answer to the following specific question: "
+        "Long": "As an expert visual assistant capable of detailed image analysis and OCR, please examine this image thoroughly. Pay attention to all text, objects, and context within the scene. Based on your comprehensive understanding of the visual content, please provide a precise answer to the following specific question: ",
     }
+
 
 def measure_inference(model, tokenizer, image_processor, image, prompt, device):
     qs = prompt
     if model.config.mm_use_im_start_end:
-        qs = DEFAULT_IM_START_TOKEN + DEFAULT_IMAGE_TOKEN + DEFAULT_IM_END_TOKEN + '\n' + qs
+        qs = (
+            DEFAULT_IM_START_TOKEN
+            + DEFAULT_IMAGE_TOKEN
+            + DEFAULT_IM_END_TOKEN
+            + "\n"
+            + qs
+        )
     else:
-        qs = DEFAULT_IMAGE_TOKEN + '\n' + qs
+        qs = DEFAULT_IMAGE_TOKEN + "\n" + qs
 
-    conv = conv_templates['qwen_2'].copy()
+    conv = conv_templates["qwen_2"].copy()
     conv.append_message(conv.roles[0], qs)
     conv.append_message(conv.roles[1], None)
     prompt_formatted = conv.get_prompt()
 
-    input_ids = tokenizer_image_token(prompt_formatted, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(0).to(device)
+    input_ids = (
+        tokenizer_image_token(
+            prompt_formatted, tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt"
+        )
+        .unsqueeze(0)
+        .to(device)
+    )
     image_tensor = process_images([image], image_processor, model.config)[0]
 
     if torch.cuda.is_available():
@@ -69,9 +100,9 @@ def measure_inference(model, tokenizer, image_processor, image, prompt, device):
         first_token_event = torch.cuda.Event(enable_timing=True)
         end_event = torch.cuda.Event(enable_timing=True)
         start_event.record()
-    
+
     start_time = time.perf_counter()
-    
+
     with torch.no_grad():
         # Generate first token for TTFT
         _ = model.generate(
@@ -79,11 +110,11 @@ def measure_inference(model, tokenizer, image_processor, image, prompt, device):
             images=image_tensor.unsqueeze(0).to(device, dtype=torch.float16),
             max_new_tokens=1,
             do_sample=False,
-            use_cache=True
+            use_cache=True,
         )
         if torch.cuda.is_available():
             first_token_event.record()
-        
+
         first_token_time = time.perf_counter()
 
         # Generate full response
@@ -92,9 +123,9 @@ def measure_inference(model, tokenizer, image_processor, image, prompt, device):
             images=image_tensor.unsqueeze(0).to(device, dtype=torch.float16),
             max_new_tokens=20,
             do_sample=False,
-            use_cache=True
+            use_cache=True,
         )
-    
+
     if torch.cuda.is_available():
         end_event.record()
         torch.cuda.synchronize()
@@ -106,16 +137,19 @@ def measure_inference(model, tokenizer, image_processor, image, prompt, device):
 
     generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
     prompt_tokens = input_ids.shape[1]
-    
+
     return latency, ttft, prompt_tokens, generated_text
+
 
 def run_experiment(args):
     print(f"🚀 Starting Prompt Length Effect (TextVQA)")
     print(f"Model: {args.model_path}")
 
     model, tokenizer, image_processor = setup_model(args.model_path, args.device)
-    dataset = get_benchmark_dataset("textvqa", split="validation", max_samples=args.num_samples)
-    
+    dataset = get_benchmark_dataset(
+        "textvqa", split="validation", max_samples=args.num_samples
+    )
+
     prefixes = get_prompt_prefixes()
     results = []
 
@@ -124,15 +158,19 @@ def run_experiment(args):
         latencies = []
         ttfts = []
         token_counts = []
-        
+
         for i, sample in enumerate(tqdm(dataset)):
-            image = sample['image']
-            base_question = sample['question'] if 'question' in sample else "Describe this image."
+            image = sample["image"]
+            base_question = (
+                sample["question"] if "question" in sample else "Describe this image."
+            )
             prompt = prefix + base_question
-            
+
             try:
-                latency, ttft, tokens, _ = measure_inference(model, tokenizer, image_processor, image, prompt, args.device)
-                
+                latency, ttft, tokens, _ = measure_inference(
+                    model, tokenizer, image_processor, image, prompt, args.device
+                )
+
                 latencies.append(latency)
                 ttfts.append(ttft)
                 token_counts.append(tokens)
@@ -144,20 +182,24 @@ def run_experiment(args):
             avg_lat = np.mean(latencies)
             avg_ttft = np.mean(ttfts)
             avg_tokens = np.mean(token_counts)
-            
-            results.append({
-                'category': category,
-                'avg_tokens': avg_tokens,
-                'latency': avg_lat,
-                'ttft': avg_ttft
-            })
-            print(f"Avg Tokens: {avg_tokens:.1f} | Avg Latency: {avg_lat:.2f}ms | Avg TTFT: {avg_ttft:.2f}ms")
+
+            results.append(
+                {
+                    "category": category,
+                    "avg_tokens": avg_tokens,
+                    "latency": avg_lat,
+                    "ttft": avg_ttft,
+                }
+            )
+            print(
+                f"Avg Tokens: {avg_tokens:.1f} | Avg Latency: {avg_lat:.2f}ms | Avg TTFT: {avg_ttft:.2f}ms"
+            )
 
     # Save Results
-    os.makedirs('results', exist_ok=True)
-    csv_path = 'results/prompt_length_textvqa.csv'
-    with open(csv_path, 'w', newline='') as f:
-        fieldnames = ['category', 'avg_tokens', 'latency', 'ttft']
+    os.makedirs("results", exist_ok=True)
+    csv_path = "results/prompt_length_textvqa.csv"
+    with open(csv_path, "w", newline="") as f:
+        fieldnames = ["category", "avg_tokens", "latency", "ttft"]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(results)
@@ -165,16 +207,21 @@ def run_experiment(args):
 
     # Plot
     if results:
-        tokens_val = [r['avg_tokens'] for r in results]
-        lat_val = [r['latency'] for r in results]
-        ttft_val = [r['ttft'] for r in results]
-        
+        tokens_val = [r["avg_tokens"] for r in results]
+        lat_val = [r["latency"] for r in results]
+        ttft_val = [r["ttft"] for r in results]
+
         save_dual_axis_plot(
-            tokens_val, lat_val, ttft_val,
-            "Prompt Tokens", "Total Latency (ms)", "TTFT (ms)",
+            tokens_val,
+            lat_val,
+            ttft_val,
+            "Prompt Tokens",
+            "Total Latency (ms)",
+            "TTFT (ms)",
             "Prompt Length Effect (TextVQA)",
-            "prompt_length_effect.pdf"
+            "prompt_length_effect.pdf",
         )
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

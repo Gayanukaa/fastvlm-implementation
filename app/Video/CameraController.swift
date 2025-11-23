@@ -94,7 +94,7 @@ public class CameraController: NSObject {
                 }
             }
         }
-    
+
     private func updateRotation(rotation : CGFloat) {
         guard let captureSession else { return }
         for output in captureSession.outputs {
