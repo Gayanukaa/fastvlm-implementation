@@ -86,10 +86,14 @@ def save_plot(x: List[float], y: List[float], xlabel: str, ylabel: str,
     plt.tight_layout()
 
     full_path = ensure_plot_dir(filename)
-    plt.savefig(full_path, format='pdf', bbox_inches='tight')  # PDF for LaTeX
-    plt.savefig(full_path.replace('.png', '.png'), format='png', bbox_inches='tight')  # PNG backup
+
+    # Force PNG extension if PDF was requested
+    if full_path.endswith('.pdf'):
+        full_path = full_path.replace('.pdf', '.png')
+
+    plt.savefig(full_path, format='png', bbox_inches='tight')
     plt.close()
-    print(f"📊 LaTeX-style plot saved: {full_path}")
+    print(f"📊 Plot saved: {full_path}")
 
 def save_dual_axis_plot(x: List[float], y1: List[float], y2: List[float],
                        xlabel: str, y1label: str, y2label: str,
@@ -138,10 +142,14 @@ def save_dual_axis_plot(x: List[float], y1: List[float], y2: List[float],
     fig.tight_layout()
 
     full_path = ensure_plot_dir(filename)
-    plt.savefig(full_path.replace('.png', '.pdf'), format='pdf', bbox_inches='tight')
+
+    # Force PNG extension if PDF was requested
+    if full_path.endswith('.pdf'):
+        full_path = full_path.replace('.pdf', '.png')
+
     plt.savefig(full_path, format='png', bbox_inches='tight')
     plt.close()
-    print(f"📊 LaTeX-style dual-axis plot saved: {full_path}")
+    print(f"📊 Dual-axis plot saved: {full_path}")
 
 def save_grouped_bar(data: Dict[str, List[float]], labels: List[str],
                     xlabel: str, ylabel: str, title: str, filename: str) -> None:
@@ -204,10 +212,14 @@ def save_grouped_bar(data: Dict[str, List[float]], labels: List[str],
     plt.tight_layout()
 
     full_path = ensure_plot_dir(filename)
-    plt.savefig(full_path.replace('.png', '.pdf'), format='pdf', bbox_inches='tight')
+
+    # Force PNG extension if PDF was requested
+    if full_path.endswith('.pdf'):
+        full_path = full_path.replace('.pdf', '.png')
+
     plt.savefig(full_path, format='png', bbox_inches='tight')
     plt.close()
-    print(f"📊 LaTeX-style grouped bar chart saved: {full_path}")
+    print(f"📊 Grouped bar chart saved: {full_path}")
 
 def save_heatmap(data: np.ndarray, row_labels: List[str], col_labels: List[str],
                 title: str, filename: str, cmap: str = 'RdYlBu_r') -> None:
@@ -253,10 +265,14 @@ def save_heatmap(data: np.ndarray, row_labels: List[str], col_labels: List[str],
     plt.tight_layout()
 
     full_path = ensure_plot_dir(filename)
-    plt.savefig(full_path.replace('.png', '.pdf'), format='pdf', bbox_inches='tight')
+
+    # Force PNG extension if PDF was requested
+    if full_path.endswith('.pdf'):
+        full_path = full_path.replace('.pdf', '.png')
+
     plt.savefig(full_path, format='png', bbox_inches='tight')
     plt.close()
-    print(f"📊 LaTeX-style heatmap saved: {full_path}")
+    print(f"📊 Heatmap saved: {full_path}")
 
 def save_scatter_plot(x: List[float], y: List[float], labels: List[str],
                      xlabel: str, ylabel: str, title: str, filename: str) -> None:
@@ -296,10 +312,14 @@ def save_scatter_plot(x: List[float], y: List[float], labels: List[str],
     plt.tight_layout()
 
     full_path = ensure_plot_dir(filename)
-    plt.savefig(full_path.replace('.png', '.pdf'), format='pdf', bbox_inches='tight')
+
+    # Force PNG extension if PDF was requested
+    if full_path.endswith('.pdf'):
+        full_path = full_path.replace('.pdf', '.png')
+
     plt.savefig(full_path, format='png', bbox_inches='tight')
     plt.close()
-    print(f"📊 LaTeX-style scatter plot saved: {full_path}")
+    print(f"📊 Scatter plot saved: {full_path}")
 
 def save_correlation_plot(x: List[float], y: List[float], xlabel: str, ylabel: str,
                          title: str, filename: str, show_correlation: bool = True) -> None:
@@ -345,7 +365,11 @@ def save_correlation_plot(x: List[float], y: List[float], xlabel: str, ylabel: s
     plt.tight_layout()
 
     full_path = ensure_plot_dir(filename)
-    plt.savefig(full_path.replace('.png', '.pdf'), format='pdf', bbox_inches='tight')
+
+    # Force PNG extension if PDF was requested
+    if full_path.endswith('.pdf'):
+        full_path = full_path.replace('.pdf', '.png')
+
     plt.savefig(full_path, format='png', bbox_inches='tight')
     plt.close()
-    print(f"📊 LaTeX-style correlation plot saved: {full_path}")
+    print(f"📊 Correlation plot saved: {full_path}")
