@@ -147,3 +147,5 @@ results/
 experiments/results/
 videos/
 fastvlm-windows-repro/
+experiments/old_results/
+encoder_models/
