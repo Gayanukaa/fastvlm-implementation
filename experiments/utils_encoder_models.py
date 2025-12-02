@@ -224,31 +224,48 @@
 
 
 
+import sys
+import os
+
+# Add parent directory to path to import llava modules
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
 import torch
 import open_clip
 from torchvision import transforms
 from torchvision.models import convnext_large
-from transformers import AutoModel
 
 MODEL_PATH = "encoder_models/"   # folder where .pt files are stored
 
-def load_encoder(name):
+
+def load_encoder(name, resolution=224):
+    """
+    Load encoder model with appropriate preprocessing.
+
+    Args:
+        name: Encoder name ('convnext', 'vit', 'fastvit')
+        resolution: Input resolution (default 224, use 320 for ConvNeXt per paper)
+
+    Returns:
+        (model, preprocess) tuple
+    """
     name = name.lower()
 
     if name == "convnext":
-        print("🔹 Loading ConvNeXt-L encoder...")
+        print(f"🔹 Loading ConvNeXt-L encoder (resolution={resolution})...")
         model = convnext_large(weights=None)
         weights = torch.load(MODEL_PATH + "convnext_large.pt", map_location="cpu")
         model.load_state_dict(weights)
+        # Use the specified resolution (paper uses 320 for ConvNeXt)
         preprocess = transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
+            transforms.Resize(resolution + 32),  # slightly larger for crop
+            transforms.CenterCrop(resolution),
             transforms.ToTensor()
         ])
         return model.eval(), preprocess
 
     elif name == "vit":
-        print("🔹 Loading ViT-L/14 (OpenCLIP) encoder...")
+        print(f"🔹 Loading ViT-L/14 (OpenCLIP) encoder (resolution={resolution})...")
         model, preprocess, _ = open_clip.create_model_and_transforms(
             "ViT-L-14", pretrained=None
         )
@@ -257,17 +274,51 @@ def load_encoder(name):
         return model.eval(), preprocess
 
     elif name == "fastvit":
-        print("🔹 Loading FastViT-HD encoder...")
-        model = AutoModel.from_pretrained(
-            "kevin510/fast-vit-hd",
-            trust_remote_code=True
-        )
-        weights = torch.load(MODEL_PATH + "fastvithd.pt", map_location="cpu")
-        model.load_state_dict(weights)
+        print(f"🔹 Loading FastViT-HD encoder (resolution={resolution})...")
+        # Use the local FastViT-HD implementation from the project
+        # This is the actual efficient encoder used in the paper
+        # Note: fastvithd() already sets inference_mode=True internally
+        from llava.model.multimodal_encoder.mobileclip.mci import fastvithd
 
+        # num_classes=0 removes classification head, keeping encoder only
+        model = fastvithd(pretrained=False, num_classes=0)
+
+        # Prefer checkpoint-extracted weights (already reparameterized)
+        checkpoint_weights_path = MODEL_PATH + "fastvithd_from_checkpoint.pt"
+        fallback_weights_path = MODEL_PATH + "fastvithd.pt"
+
+        weights_loaded = False
+
+        # Try checkpoint weights first (reparameterized, faster)
+        if os.path.exists(checkpoint_weights_path):
+            try:
+                weights = torch.load(checkpoint_weights_path, map_location="cpu")
+                model.load_state_dict(weights, strict=False)
+                print(f"  ✓ Loaded reparameterized weights from checkpoint (fast mode)")
+                weights_loaded = True
+            except Exception as e:
+                print(f"  ⚠ Could not load checkpoint weights: {e}")
+
+        # Fallback to original weights
+        if not weights_loaded and os.path.exists(fallback_weights_path):
+            try:
+                weights = torch.load(fallback_weights_path, map_location="cpu")
+                if isinstance(weights, dict) and 'state_dict' in weights:
+                    weights = weights['state_dict']
+                model.load_state_dict(weights, strict=False)
+                print(f"  ✓ Loaded weights from fastvithd.pt")
+                weights_loaded = True
+            except Exception as e:
+                print(f"  ⚠ Could not load weights: {e}")
+
+        if not weights_loaded:
+            print(f"  ⚠ No weights found, using random initialization")
+
+        # FastViT uses 256x256 input by default (from timm config)
+        # But can also work with 224
         preprocess = transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
+            transforms.Resize(resolution + 32),
+            transforms.CenterCrop(resolution),
             transforms.ToTensor()
         ])
         return model.eval(), preprocess
