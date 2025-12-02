@@ -222,12 +222,139 @@ The number of visual tokens scales with `(resolution / 64)²` due to FastViT-HD'
 </details>
 
 <details>
-<summary><b>✔️ Figure — Stage Comparison (Stage-2 vs Stage-3)</b></summary>
+<summary><b>✔️ Figure 4 — Pareto Curve (Avg-5 Score vs TTFT)</b></summary>
 
-**Script:** `exp_stage_comparison.py`
+**Script:** `exp_stage_comparison.py --replication-target figure4`
+
+**What It Replicates:**  
+Generates the Pareto curve showing the trade-off between accuracy (Avg-5 Score) and latency (TTFT). The script automatically loops through multiple resolutions (256, 512, 768, 1024) and plots them as a line graph.
+
+**Usage:**
+
+```bash
+# Automatic multi-resolution sweep + Pareto curve generation
+python exp_stage_comparison.py --replication-target figure4 --num-samples 100
+
+# Quick test with fewer samples
+python exp_stage_comparison.py --replication-target figure4 --num-samples 10
+```
+
+**Implementation Notes:**
+
+The script automatically:
+
+1. Loops through resolutions: [256, 512, 768, 1024]px
+2. At each resolution:
+   - Forces image processor to target resolution
+   - Evaluates on Avg-5 benchmarks (TextVQA, DocVQA)
+   - Measures average TTFT (time-to-first-token)
+3. Saves individual CSV results per resolution
+4. Generates Pareto curve plot with:
+   - X-axis: Latency (ms) — log scale
+   - Y-axis: Avg-5 Score (%)
+   - Annotations showing resolution at each point
+
+**Benchmarks (Avg-5 subset):** TextVQA, DocVQA  
+_(Full Avg-5 in paper: TextVQA, DocVQA, ChartQA, AI2D, InfoVQA)_
+
+**Metrics:**
+
+- Avg-N Score (%) — average accuracy across available benchmarks
+- Avg TTFT (ms) — average time-to-first-token (GPU-only timing)
+
+**Output:**
+
+- `results/figure4_{resolution}px_results.csv` — per-resolution data
+- `results/plots/figure4_pareto_curve.png` — Pareto curve visualization
+
+**Limitations:**
+
+- Only 2 of 5 benchmarks available (TextVQA, DocVQA) — ChartQA, AI2D, InfoVQA not implemented
+- Resolution override forces image processor to target size, but model was trained at specific resolution
+- Accuracy uses exact match, not official VQA/ANLS metrics
+- TTFT measured on NVIDIA GPU (paper uses Apple M1 Max for Figure 4)
+- FastViT-HD visual tokens scale as (resolution // 64)² affecting prefill cost
+
+</details>
+
+<details>
+<summary><b>✔️ Table 6 — VLM Benchmark Comparison (Partial)</b></summary>
+
+**Script:** `exp_stage_comparison.py --replication-target table6`
+
+**What It Replicates:**  
+Evaluates FastVLM on the Avg-5 benchmark suite used in Table 6 for comparing VLM performance.
+
+**Usage:**
+
+```bash
+python exp_stage_comparison.py --replication-target table6 --resolution 1024 --num-samples 100
+```
+
+**Benchmarks (Avg-5 subset):** TextVQA, DocVQA
+
+**Metrics:**
+
+- Per-benchmark accuracy (%)
+- Avg-N Score (%)
+- Inference latency (ms)
+
+**Output:** `results/table6_{resolution}px_results.csv`
+
+**Limitations:**
+
+- Only 2 of 5 benchmarks available — full Table 6 requires ChartQA, AI2D, InfoVQA
+- Paper compares multiple models (LLaVA variants, Cambrian, etc.) — we only have FastVLM checkpoint
+- Accuracy uses exact match as a proxy for official metrics
+
+</details>
+
+<details>
+<summary><b>✔️ Table 11 — Text-Rich Benchmark Evaluation (Partial)</b></summary>
+
+**Script:** `exp_stage_comparison.py --replication-target table11`
+
+**What It Replicates:**  
+Evaluates FastVLM on text-rich benchmarks at specific resolutions as shown in Table 11.
+
+**Usage:**
+
+```bash
+python exp_stage_comparison.py --replication-target table11 --resolution 1024 --num-samples 100
+python exp_stage_comparison.py --replication-target table11 --resolution 1152 --num-samples 100
+```
+
+**Benchmarks (Text-Rich subset):** TextVQA, DocVQA  
+_(Full set in paper: TextVQA, DocVQA, ChartQA, InfoVQA, OCRBench)_
+
+**Metrics:**
+
+- Per-benchmark accuracy (%)
+- Inference latency (ms)
+
+**Output:** `results/table11_{resolution}px_results.csv`
+
+**Limitations:**
+
+- Only 2 of 5 text-rich benchmarks available
+- Resolution override may not fully replicate paper's multi-resolution training
+- Official ANLS metric for DocVQA is approximated with exact match
+
+</details>
+
+<details>
+<summary><b>✔️ Stage Comparison (Stage-2 vs Stage-3)</b></summary>
+
+**Script:** `exp_stage_comparison.py --replication-target stage-comparison`
 
 **What It Replicates:**  
 Compares performance between Stage-2 (pre-training) and Stage-3 (fine-tuned) checkpoints on TextVQA.
+
+**Usage:**
+
+```bash
+python exp_stage_comparison.py --replication-target stage-comparison --stage2-path ../checkpoints/llava-fastvithd_0.5b_stage2 --stage3-path ../checkpoints/llava-fastvithd_0.5b_stage3 --num-samples 20
+```
 
 **Models Compared:**
 
@@ -237,10 +364,9 @@ Compares performance between Stage-2 (pre-training) and Stage-3 (fine-tuned) che
 **Metrics:**
 
 - TextVQA accuracy (Exact Match %)
-- Time-to-First-Token (TTFT)
-- Total inference latency
+- Inference latency (ms)
 
-**Output:** `results/plots/stage_comparison_textvqa.png`
+**Output:** `results/stage_comparison_textvqa.csv`, `results/plots/stage_comparison_*.png`
 
 **Limitations:**
 
