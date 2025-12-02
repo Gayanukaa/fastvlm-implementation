@@ -37,7 +37,8 @@ def get_benchmark_dataset(
     try:
         # ======== TextVQA (Standard) ========
         if benchmark_name == "textvqa":
-            dataset = load_dataset("textvqa", split=split, streaming=True)
+            # Use lmms-lab/textvqa which has a modern format
+            dataset = load_dataset("lmms-lab/textvqa", split=split, streaming=True)
 
             for idx, sample in tqdm(enumerate(dataset), total=max_samples, desc="Processing TextVQA"):
                 if idx >= max_samples:
