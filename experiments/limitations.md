@@ -128,9 +128,10 @@ Evaluates multiple encoder/resolution combinations for visual token efficiency, 
 
 - Only one checkpoint is available (`llava-fastvithd_0.5b_stage3`), so accuracy values are the same across all encoder configurations
 - To properly replicate Table 4, separate fine-tuned checkpoints for each encoder/resolution would be required
-- GQA benchmark is disabled due to HuggingFace dataset loading issues
+- GQA benchmark is disabled — lmms-lab/GQA requires joining separate image and instruction configs, which defeats streaming and requires downloading the full image dataset (~10GB)
 - Accuracy metric uses relaxed matching (not official VQA evaluation protocol)
 - MAX_SAMPLES is set to 10 for quick testing; full dataset evaluation requires more time
+- Datasets: lmms-lab/textvqa (streaming), lmms-lab/DocVQA (streaming)
 
 </details>
 

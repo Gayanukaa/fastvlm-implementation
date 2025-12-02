@@ -56,7 +56,7 @@ ENCODER_CONFIGS: List[Tuple[str, str, int, int]] = [
 BENCHMARKS = [
     ("textvqa", "TextVQA"),
     ("docvqa", "DocVQA"),
-    # ("gqa", "GQA"),  # Commented out - dataset loading issues
+    # ("gqa", "GQA"),  # Disabled - lmms-lab/GQA requires joining separate image and instruction configs
 ]
 
 # Set to None to use full dataset, or a number for quick testing
