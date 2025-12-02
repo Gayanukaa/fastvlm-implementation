@@ -1,11 +1,14 @@
 """
-make_table5_fastvlm.py
+exp_table5.py
 
-Mini Table 5 (FastViT-HD Visual Token Efficiency with Accuracy):
+Table 5 Replication (FastViT-HD Visual Token Efficiency):
 
 For FastViT-HD, measure for each resolution:
-- Visual token count (based on 64x downsampling)
-- Benchmark accuracy (TextVQA) using full VLM inference
+- Visual token count (based on 64x downsampling): (resolution / 64)²
+- Benchmark accuracy (TextVQA) using full VLM inference at each resolution
+
+Key: Images are RESIZED to each target resolution before inference to properly
+measure how accuracy scales with visual token count.
 
 Uses:
 - FastViT-HD encoder from the VLM checkpoint
@@ -51,9 +54,11 @@ DTYPE = torch.float16 if DEVICE == "cuda" else torch.float32
 CONV_MODE = "qwen_2"
 
 # Resolutions to evaluate (matching paper Table 5)
+# These are the input resolutions to the vision encoder
 RESOLUTIONS = [256, 512, 768, 1024]
 
 # FastViT-HD downsampling factor (64x)
+# Visual tokens = (resolution / 64)²
 DOWNSAMPLE_FACTOR = 64
 
 # Set to None for full dataset, or a number for quick testing
@@ -119,16 +124,30 @@ def load_vlm_model():
     return tokenizer, model, image_processor
 
 
-def run_inference(
+def resize_image(image: Image.Image, target_resolution: int) -> Image.Image:
+    """
+    Resize image to target resolution (square).
+    Uses LANCZOS resampling for high quality downscaling.
+    """
+    return image.resize((target_resolution, target_resolution), Image.LANCZOS)
+
+
+def run_inference_at_resolution(
     model,
     tokenizer,
     image_processor,
     image: Image.Image,
-    question: str
+    question: str,
+    target_resolution: int
 ) -> Tuple[str, float]:
     """
-    Run VLM inference and return (answer, latency_ms).
+    Run VLM inference at a specific resolution and return (answer, latency_ms).
+
+    The image is resized to target_resolution before being processed.
     """
+    # Resize image to target resolution
+    resized_image = resize_image(image, target_resolution)
+
     # Construct prompt
     qs = DEFAULT_IMAGE_TOKEN + "\n" + question
     conv = conv_templates[CONV_MODE].copy()
@@ -141,8 +160,8 @@ def run_inference(
         prompt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt"
     ).unsqueeze(0).to(device=DEVICE)
 
-    # Process image
-    image_tensor = process_images([image], image_processor, model.config)[0]
+    # Process the resized image
+    image_tensor = process_images([resized_image], image_processor, model.config)[0]
 
     # Run inference with timing
     if DEVICE == "cuda":
@@ -154,7 +173,7 @@ def run_inference(
         output_ids = model.generate(
             input_ids,
             images=image_tensor.unsqueeze(0).to(dtype=DTYPE),
-            image_sizes=[image.size],
+            image_sizes=[resized_image.size],  # Use resized image size
             do_sample=False,  # Greedy decoding for consistency
             max_new_tokens=64,
             use_cache=True,
@@ -173,63 +192,59 @@ def run_inference(
 
 # ---------------- BENCHMARK FUNCTIONS ---------------- #
 
-def evaluate_on_textvqa(
+def evaluate_at_resolution(
     model,
     tokenizer,
     image_processor,
-    max_samples: Optional[int] = None,
+    samples: List[Dict[str, Any]],
+    target_resolution: int,
 ) -> Dict[str, Any]:
     """
-    Evaluate model on TextVQA benchmark.
-    Returns accuracy percentage.
+    Evaluate model on samples at a specific resolution.
+    Returns accuracy percentage and average latency.
     """
-    # Determine sample count
-    if max_samples is None:
-        sample_limit = 100000
-        print(f"\n📚 Loading TextVQA (FULL dataset)")
-    else:
-        sample_limit = max_samples
-        print(f"\n📚 Loading TextVQA (max_samples={max_samples})")
+    print(f"\n   📐 Evaluating at {target_resolution}x{target_resolution} resolution...")
 
-    samples = get_benchmark_dataset("textvqa", "validation", sample_limit)
-    if len(samples) == 0:
-        print(f"⚠️ No samples loaded for TextVQA.")
-        return {"accuracy": None, "num_samples": 0}
-
-    print(f"   ➜ Loaded {len(samples)} samples.")
-
-    # Warmup
+    # Warmup at this resolution
     if len(samples) > 0:
-        print("   ➜ Warming up...")
+        print(f"      Warming up...")
         for _ in range(min(N_WARMUP, len(samples))):
-            _ = run_inference(model, tokenizer, image_processor,
-                            samples[0]["image"], samples[0]["question"])
+            _ = run_inference_at_resolution(
+                model, tokenizer, image_processor,
+                samples[0]["image"], samples[0]["question"],
+                target_resolution
+            )
 
     # Evaluate
     correct = 0
     total = 0
+    latencies = []
 
-    for sample in tqdm(samples, desc="Evaluating TextVQA"):
+    for sample in tqdm(samples, desc=f"Eval @{target_resolution}px"):
         try:
-            prediction, _ = run_inference(
+            prediction, latency = run_inference_at_resolution(
                 model, tokenizer, image_processor,
-                sample["image"], sample["question"]
+                sample["image"], sample["question"],
+                target_resolution
             )
 
             acc = vqa_accuracy(prediction, sample["answers"])
             correct += acc
             total += 1
+            latencies.append(latency)
 
         except Exception as e:
             print(f"⚠️ Error on sample: {e}")
             continue
 
     accuracy = (correct / total * 100) if total > 0 else None
+    avg_latency = sum(latencies) / len(latencies) if latencies else None
 
-    print(f"   ➜ Accuracy: {accuracy:.1f}%")
+    print(f"      ➜ Accuracy: {accuracy:.1f}% | Avg Latency: {avg_latency:.1f}ms")
 
     return {
         "accuracy": accuracy,
+        "avg_latency_ms": avg_latency,
         "num_samples": total,
     }
 
@@ -243,7 +258,8 @@ def build_table5() -> List[Dict[str, Any]]:
     print(f"\n🚀 Running Table 5 benchmark (FastViT-HD Visual Token Efficiency)")
     print(f"   Device: {DEVICE} | dtype: {DTYPE}")
     print(f"   Max samples: {'FULL' if MAX_SAMPLES is None else MAX_SAMPLES}")
-    print(f"   Resolutions: {RESOLUTIONS}\n")
+    print(f"   Resolutions: {RESOLUTIONS}")
+    print(f"   Downsampling factor: {DOWNSAMPLE_FACTOR}x\n")
 
     # Load VLM model once
     try:
@@ -252,30 +268,43 @@ def build_table5() -> List[Dict[str, Any]]:
         print(f"❌ Failed to load VLM model: {e}")
         return []
 
-    # Evaluate TextVQA once (accuracy is model-dependent, not resolution-dependent
-    # since we only have one checkpoint)
+    # Load TextVQA samples once (we'll reuse them for each resolution)
     print("\n" + "=" * 60)
-    print("  Evaluating TextVQA accuracy...")
+    print("  Loading TextVQA samples...")
     print("=" * 60)
 
-    textvqa_result = evaluate_on_textvqa(
-        model, tokenizer, image_processor, max_samples=MAX_SAMPLES
-    )
-    textvqa_acc = textvqa_result["accuracy"]
+    sample_limit = MAX_SAMPLES if MAX_SAMPLES is not None else 100000
+    samples = get_benchmark_dataset("textvqa", "validation", sample_limit)
 
-    # Build table rows for each resolution
+    if len(samples) == 0:
+        print("⚠️ No TextVQA samples loaded. Exiting.")
+        return []
+
+    print(f"   ➜ Loaded {len(samples)} samples.")
+
+    # Evaluate at each resolution
+    print("\n" + "=" * 60)
+    print("  Evaluating accuracy at each resolution...")
+    print("=" * 60)
+
     for res in RESOLUTIONS:
         tokens = calculate_visual_tokens(res, DOWNSAMPLE_FACTOR)
+        print(f"\n{'─'*50}")
+        print(f"  Resolution: {res}px → {tokens} visual tokens")
+        print(f"{'─'*50}")
+
+        result = evaluate_at_resolution(
+            model, tokenizer, image_processor,
+            samples, res
+        )
 
         rows.append({
             "model": "FastViT-HD",
             "resolution": res,
             "tokens": tokens,
-            "textvqa_acc": textvqa_acc,
+            "textvqa_acc": result["accuracy"],
+            "avg_latency_ms": result["avg_latency_ms"],
         })
-
-        acc_str = f"{textvqa_acc:.1f}%" if textvqa_acc is not None else "-"
-        print(f"  ➜ {res}px: {tokens} tokens, TextVQA={acc_str}")
 
     # Clean up
     del model, tokenizer
@@ -331,3 +360,5 @@ if __name__ == "__main__":
     if rows:
         print_markdown_table(rows)
         save_table_as_image(rows)
+
+    print("\n📋 See experiments/limitations.md for replication limitations.")

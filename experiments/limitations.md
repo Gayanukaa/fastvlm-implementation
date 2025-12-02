@@ -138,27 +138,40 @@ Evaluates multiple encoder/resolution combinations for visual token efficiency, 
 <details>
 <summary><b>✔️ Table 5 — FastViT-HD Visual Token Efficiency (Mini Version)</b></summary>
 
-**Script:** `exp_table5.py` / `make_table5_fastvlm.py`
+**Script:** `exp_table5.py`
 
 **What It Replicates:**  
-Demonstrates FastViT-HD's visual token efficiency across different resolutions with accuracy measurement.
+Demonstrates FastViT-HD's visual token efficiency across different resolutions by resizing input images and measuring accuracy at each resolution separately.
 
 **Resolutions:** 256, 512, 768, 1024px (FastViT-HD only)
 
 **Metrics:**
 
-- Visual token count (based on 64x downsampling factor)
-- TextVQA accuracy (%)
+- Visual token count (based on 64x downsampling factor): (resolution / 64)²
+- TextVQA accuracy (%) — evaluated separately at each resolution
 
 **Output:** `results/plots/table5_fastvithd_efficiency.png`
+
+**Implementation Notes:**
+
+- Images are resized to each target resolution (256×256, 512×512, etc.) before inference
+- Accuracy is evaluated independently at each resolution, not shared across resolutions
+- Visual tokens calculated as: 16 (256px), 64 (512px), 144 (768px), 256 (1024px)
 
 **Limitations:**
 
 1. **No pruning baselines:** The original Table 5 compares FastViT-HD to several token pruning/sparsification methods from other papers. Those baseline results were taken directly from the respective papers and were not re-trained by the FastVLM authors. We do not re-implement or re-train those pruning methods.
 
-2. **Single checkpoint limitation:** We only have one fine-tuned checkpoint (`llava-fastvithd_0.5b_stage3`). The accuracy shown is from this checkpoint. The visual token counts are calculated based on the 64x downsampling factor of FastViT-HD.
+2. **Single checkpoint limitation:** We only have one fine-tuned checkpoint (`llava-fastvithd_0.5b_stage3`), which was trained at a specific resolution. In the actual paper, the authors would have either:
 
-3. **Hardware and data limitations:** The original paper uses its own hardware configuration and full benchmark datasets. Our replication may use a subset of samples for quick testing. Therefore, our accuracy numbers may differ from the paper.
+   - Trained separate models at each resolution, OR
+   - Modified the vision encoder to accept different input resolutions dynamically
+
+   Our replication resizes input images to each resolution, but the model's internal `image_processor` may further resize to the model's expected input size, limiting the true effect of resolution variation.
+
+3. **Hardware and data limitations:** The original paper uses its own hardware configuration and full benchmark datasets. Our replication uses a subset of samples (`MAX_SAMPLES=10` for quick testing). Full dataset evaluation requires setting `MAX_SAMPLES=None`.
+
+4. **Accuracy variation caveat:** While we do observe some accuracy variation across resolutions due to image resizing effects, this may not fully reflect the paper's methodology where models were potentially trained or configured for each specific resolution.
 
 </details>
 
