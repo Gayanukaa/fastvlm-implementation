@@ -387,5 +387,3 @@ if __name__ == "__main__":
     results = benchmark_table4()
     print_table(results)
     save_table_as_image(results)
-
-

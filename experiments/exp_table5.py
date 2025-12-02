@@ -323,32 +323,6 @@ def save_table_as_image(rows: List[Dict[str, Any]]):
     )
 
 
-limitations_msg = """
-[Mini Table 5 – Replication Limitations]
-
-This experiment reproduces the FastViT-HD visual token efficiency from Table 5
-of the FastVLM paper.
-
-1) No pruning baselines:
-   The original Table 5 compares FastViT-HD to several token pruning /
-   sparsification methods from other papers. Those baseline results are
-   reported directly from the respective papers and were not re-trained by
-   the FastVLM authors. In this replication, we do not re-implement or
-   re-train those pruning methods, so we only report results for FastViT-HD.
-
-2) Single checkpoint limitation:
-   We only have one fine-tuned checkpoint (llava-fastvithd_0.5b_stage3).
-   The accuracy shown is from this checkpoint. The visual token counts
-   are calculated based on the 64x downsampling factor of FastViT-HD.
-
-3) Hardware and data limitations:
-   The original paper uses its own hardware configuration and full
-   benchmark datasets. Our replication may use a subset of samples for
-   quick testing. Therefore, our accuracy numbers may differ slightly
-   from the paper.
-"""
-
-
 # ---------------- ENTRY POINT ---------------- #
 
 if __name__ == "__main__":
@@ -357,10 +331,3 @@ if __name__ == "__main__":
     if rows:
         print_markdown_table(rows)
         save_table_as_image(rows)
-
-    print("-" * 80)
-    print(limitations_msg)
-
-
-
-
