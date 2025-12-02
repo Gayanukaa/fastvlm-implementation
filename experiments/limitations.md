@@ -176,52 +176,48 @@ Demonstrates FastViT-HD's visual token efficiency across different resolutions b
 </details>
 
 <details>
-<summary><b>✔️ Figure — Resolution Scaling (Latency & VRAM)</b></summary>
+<summary><b>✔️ Figure 5 — Resolution Scaling (Vision vs LLM Prefilling Latency)</b></summary>
 
-**Script:** `exp_resolution_scaling.py`
+**Script:** `exp_figure5.py`
 
 **What It Replicates:**  
-Tests how inference latency and VRAM usage scale with input resolution using TextVQA samples.
+Measures how Vision Encoder latency and LLM Prefilling latency scale with input resolution. This replicates Figure 5 from the paper which shows a grouped bar chart comparing these two components.
 
-**Resolutions Tested:** 224, 336, 448, 512, 672, 768, 896, 1024px
+**Resolutions Tested:** 256, 512, 768, 1024, 1536px (matching the paper)
 
 **Metrics:**
 
-- Inference latency (ms)
-- Peak VRAM usage (MB)
+- Vision Latency (ms) — time for vision encoder + projector (GPU forward pass only)
+- LLM Prefilling Latency (ms) — time for LLM forward pass (no token generation)
 
-**Output:** `results/plots/resolution_scaling_textvqa.png`
+**Output:** `results/plots/figure5_resolution_scaling.png`
 
-**Limitations:**
+**Implementation Notes:**
 
-- Hardware-specific measurements (RTX 4070 8GB)
-- VRAM measurements may vary based on CUDA version and driver
-- Uses a subset of TextVQA samples for efficiency
+- **GPU-only timing:** CPU preprocessing (`process_images`) and data transfer (`.to(device)`) are done OUTSIDE the timer. Only pure GPU forward pass time is measured.
+- **Forced image processor resolution:** The script overrides the image processor's `crop_size` and `size` settings for each resolution to ensure the model actually processes the target resolution (not a default size).
+- Vision latency is measured by calling `model.encode_images()` which runs the vision tower and projection layer
+- LLM prefilling latency is measured by running a single forward pass through `model.model()` with the prepared multimodal embeddings
+- Decoding/token generation time is **excluded** (unlike `model.generate()`)
 
-</details>
+**Visual Token Scaling:**
 
-<details>
-<summary><b>✔️ Figure — Token Budget Ablation (Accuracy vs Latency)</b></summary>
+The number of visual tokens scales with `(resolution / 64)²` due to FastViT-HD's 64x downsampling:
 
-**Script:** `exp_token_budget_ablation.py`
-
-**What It Replicates:**  
-Evaluates the trade-off between accuracy and latency by varying the visual token budget via resolution scaling.
-
-**Token Budgets:** 16, 64, 144, 256, 576 tokens
-
-**Metrics:**
-
-- TextVQA accuracy (Exact Match %)
-- Inference latency (ms)
-
-**Output:** `results/plots/token_budget_textvqa.png`
+- 256px → 16 tokens
+- 512px → 64 tokens
+- 768px → 144 tokens
+- 1024px → 256 tokens
+- 1536px → 576 tokens
 
 **Limitations:**
 
-- Single checkpoint evaluation
-- Accuracy metric uses exact match comparison
-- Token budgets are approximated via resolution (actual token count depends on model architecture)
+- **Hardware differences affect latency ratios:**
+  - **Paper (Apple M1 Max):** The "LLM Prefilling" (orange bars) appears relatively slow because the M1 has lower memory bandwidth compared to server GPUs. This makes the prefill latency look significant compared to vision latency.
+  - **NVIDIA GPU (our setup):** On high-end GPUs with higher memory bandwidth, LLM prefilling is extremely fast. The orange bars (prefill) may appear much smaller relative to the blue bars (vision) compared to the paper's Figure 5.
+- FastViT-HD's efficient 64x downsampling architecture may show different scaling patterns compared to other vision encoders (e.g., ViT-L/14)
+- CUDA synchronization overhead may slightly affect timing measurements
+- Uses a subset of TextVQA samples for efficiency (`--num-samples` flag)
 
 </details>
 
