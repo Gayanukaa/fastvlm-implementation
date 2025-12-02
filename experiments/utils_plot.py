@@ -497,3 +497,81 @@ def save_correlation_plot(
     plt.savefig(full_path, format="png", bbox_inches="tight")
     plt.close()
     print(f"📊 Correlation plot saved: {full_path}")
+
+
+def save_table_image(
+    headers: List[str],
+    rows: List[List[Any]],
+    filename: str,
+    title: str = None,
+    col_widths: List[float] = None,
+) -> None:
+    """
+    Renders a table as an image using Matplotlib with LaTeX-style formatting.
+
+    Args:
+        headers: List of column headers
+        rows: List of rows (each row is a list of cell values)
+        filename: Output filename
+        title: Optional title for the table
+        col_widths: Optional list of column widths
+    """
+    num_cols = len(headers)
+    num_rows = len(rows)
+
+    # Create figure
+    # Estimate height: header + rows
+    fig_height = (num_rows + 2) * 0.5
+    # Estimate width
+    fig_width = num_cols * 2.5 if col_widths is None else sum(col_widths) * 10
+
+    # Clamp dimensions
+    fig_width = max(8, min(fig_width, 16))
+    fig_height = max(2, min(fig_height, 10))
+
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+    ax.axis("off")
+
+    # Create table
+    table = ax.table(
+        cellText=rows,
+        colLabels=headers,
+        loc="center",
+        cellLoc="center",
+        colLoc="center",
+    )
+
+    # Style the table
+    table.auto_set_font_size(False)
+    table.set_fontsize(12)
+    table.scale(1, 1.5)  # More vertical padding
+
+    # Apply LaTeX-like styling (booktabs style)
+    for (row, col), cell in table.get_celld().items():
+        cell.set_edgecolor("black")
+        cell.set_linewidth(0)  # Default no borders
+
+        if row == 0:
+            # Header row: Top and Bottom lines
+            cell.visible_edges = "TB"
+            cell.set_linewidth(1.2)
+            cell.set_text_props(weight="bold")
+        elif row == num_rows:
+            # Last data row: Bottom line
+            cell.visible_edges = "B"
+            cell.set_linewidth(1.2)
+
+    if title:
+        plt.title(title, pad=20, fontsize=14, weight="bold")
+
+    plt.tight_layout()
+
+    full_path = ensure_plot_dir(filename)
+
+    # Force PNG extension if PDF was requested
+    if full_path.endswith(".pdf"):
+        full_path = full_path.replace(".pdf", ".png")
+
+    plt.savefig(full_path, format="png", bbox_inches="tight", dpi=300)
+    plt.close()
+    print(f"📊 Table image saved: {full_path}")
