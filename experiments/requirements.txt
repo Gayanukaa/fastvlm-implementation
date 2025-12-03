@@ -1,7 +1,5 @@
 # FastVLM Experiments Requirements
 # Core ML libraries
-torch>=2.0.0
-torchvision>=0.15.0
 transformers>=4.35.0
 accelerate>=0.20.0
 

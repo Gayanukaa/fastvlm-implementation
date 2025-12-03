@@ -22,6 +22,7 @@ pip install -r requirements.txt
 ### 2. Download Encoder Models (for Table 3)
 
 ```bash
+pip install open_clip_torch
 ./download_encoder_models.sh
 ```
 
