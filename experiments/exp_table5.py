@@ -40,14 +40,16 @@ from llava.mm_utils import get_model_name_from_path, process_images, tokenizer_i
 from llava.model.builder import load_pretrained_model
 from llava.utils import disable_torch_init
 
+import argparse
+
 from utils_dataset import get_benchmark_dataset
 from utils_plot import save_table_image
 
 
 # ---------------- CONFIG ---------------- #
 
-# Model checkpoint path (contains the FastViT-HD encoder)
-MODEL_PATH = "../checkpoints/llava-fastvithd_0.5b_stage3"
+# Model checkpoint path (default, can be overridden via args)
+DEFAULT_MODEL_PATH = "../checkpoints/llava-fastvithd_0.5b_stage3"
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 DTYPE = torch.float16 if DEVICE == "cuda" else torch.float32
@@ -61,8 +63,9 @@ RESOLUTIONS = [256, 512, 768, 1024]
 # Visual tokens = (resolution / 64)²
 DOWNSAMPLE_FACTOR = 64
 
-# Set to None for full dataset, or a number for quick testing
-MAX_SAMPLES: Optional[int] = 10
+# Default: None = use full dataset, or a number for quick testing
+# Can be overridden via --num-samples argument
+MAX_SAMPLES: Optional[int] = None
 
 N_WARMUP = 3
 
@@ -355,6 +358,28 @@ def save_table_as_image(rows: List[Dict[str, Any]]):
 # ---------------- ENTRY POINT ---------------- #
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="FastVLM Table 5 Replication: FastViT-HD Visual Token Efficiency"
+    )
+    parser.add_argument(
+        "--model-path",
+        default=DEFAULT_MODEL_PATH,
+        help="Path to FastVLM checkpoint",
+    )
+    parser.add_argument("--device", default="cuda")
+    parser.add_argument(
+        "--num-samples",
+        type=int,
+        default=None,
+        help="Samples for evaluation (default: full dataset)",
+    )
+    args = parser.parse_args()
+
+    # Override module-level config with args
+    MODEL_PATH = args.model_path
+    MAX_SAMPLES = args.num_samples
+    DEVICE = args.device
+
     rows = build_table5()
 
     if rows:

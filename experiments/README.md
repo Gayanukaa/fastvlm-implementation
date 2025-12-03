@@ -1,15 +1,15 @@
-# FastVLM Ablation Experiments
+# FastVLM Replication Experiments
 
-This folder contains standalone scripts to reproduce and visualize FastVLM ablation experiments using the **TextVQA benchmark**, optimized for RTX 4070 8GB GPU.
+This folder contains scripts to replicate key results from the FastVLM paper (CVPR 2025), including Tables 3, 4, 5 and Figure 5.
 
 ## Experiments Overview
 
-| Experiment                | Script                         | Purpose                                    | Key Metrics                  |
-| ------------------------- | ------------------------------ | ------------------------------------------ | ---------------------------- |
-| **Resolution Scaling**    | `exp_resolution_scaling.py`    | Test resolutions [224, 336, ..., 1024]     | Latency, VRAM                |
-| **Token Budget Ablation** | `exp_token_budget_ablation.py` | Test token budgets [16, 64, 144, 256, 576] | Accuracy vs Latency          |
-| **Stage Comparison**      | `exp_stage_comparison.py`      | Compare Stage-2 vs Stage-3 models          | Accuracy (Exact Match), TTFT |
-| **Prompt Length Effect**  | `exp_prompt_length_effect.py`  | Test prompts [Short, Medium, Long]         | Latency, TTFT                |
+| Script           | Paper Reference | Description                                                     | Datasets            |
+| ---------------- | --------------- | --------------------------------------------------------------- | ------------------- |
+| `exp_table3.py`  | Table 3         | Encoder comparison benchmark (ViT-L/14, ConvNeXt-L, FastViT-HD) | None (latency only) |
+| `exp_table4.py`  | Table 4         | Visual token efficiency across encoders and resolutions         | TextVQA, DocVQA     |
+| `exp_table5.py`  | Table 5         | FastViT-HD visual token scaling (256-1024px)                    | TextVQA             |
+| `exp_figure5.py` | Figure 5        | Vision encoder vs LLM prefilling latency breakdown              | TextVQA             |
 
 ## Quick Start
 
@@ -19,105 +19,175 @@ This folder contains standalone scripts to reproduce and visualize FastVLM ablat
 pip install -r requirements.txt
 ```
 
-### 2. Run All Experiments
-
-**Linux/Mac:**
+### 2. Download Encoder Models (for Table 3)
 
 ```bash
-# Usage: ./run_all_experiments.sh [stage2_path] [stage3_path] [device] [num_samples]
-./run_all_experiments.sh ../checkpoints/llava-fastvithd_0.5b_stage2 ../checkpoints/llava-fastvithd_0.5b_stage3 cuda 20
+./download_encoder_models.sh
 ```
+
+### 3. Run All Experiments
+
+```bash
+# Full dataset evaluation
+./run_all_experiments.sh ../checkpoints/llava-fastvithd_0.5b_stage3 cuda
+
+# Quick test with 10 samples
+./run_all_experiments.sh ../checkpoints/llava-fastvithd_0.5b_stage3 cuda 10
+```
+
+**Arguments:**
+
+```
+./run_all_experiments.sh [MODEL_PATH] [DEVICE] [NUM_SAMPLES]
+```
+
+- `MODEL_PATH`: Path to FastVLM checkpoint (default: `../checkpoints/llava-fastvithd_0.5b_stage3`)
+- `DEVICE`: `cuda` or `cpu` (default: `cuda`)
+- `NUM_SAMPLES`: Number of samples per benchmark. Omit for full dataset.
 
 ## Individual Experiments
 
-### Resolution Scaling
+### Table 3: Encoder Comparison
 
-Measures inference latency and VRAM usage across different input resolutions using TextVQA samples.
-
-```bash
-python exp_resolution_scaling.py \
-    --model-path ../checkpoints/llava-fastvithd_0.5b_stage3 \
-    --device cuda \
-    --num-samples 20
-```
-
-### Token Budget Ablation
-
-Evaluates the trade-off between accuracy (Exact Match) and latency by varying the visual token budget (via resolution).
+Benchmarks vision encoder latency and parameter count. No dataset required.
 
 ```bash
-python exp_token_budget_ablation.py \
-    --model-path ../checkpoints/llava-fastvithd_0.5b_stage3 \
-    --device cuda \
-    --num-samples 20
+python exp_table3.py
 ```
 
-### Stage Comparison
+**Output:**
 
-Compares the performance of Stage 2 (Pre-training) vs Stage 3 (Fine-tuning) models on the TextVQA benchmark.
+- `results/table3_encoder_comparison.png`
+
+**Encoders tested:**
+
+- ViT-L/14 (224px)
+- ConvNeXt-L (320px)
+- FastViT-HD (224px)
+
+---
+
+### Table 4: Visual Token Efficiency
+
+Evaluates accuracy and latency across different encoder/resolution combinations.
 
 ```bash
-python exp_stage_comparison.py \
-    --stage2-path ../checkpoints/llava-fastvithd_0.5b_stage2 \
-    --stage3-path ../checkpoints/llava-fastvithd_0.5b_stage3 \
-    --device cuda \
-    --num-samples 20
+# Full dataset
+python exp_table4.py --model-path ../checkpoints/llava-fastvithd_0.5b_stage3 --device cuda
+
+# Quick test
+python exp_table4.py --model-path ../checkpoints/llava-fastvithd_0.5b_stage3 --device cuda --num-samples 10
 ```
 
-### Prompt Length Effect
+**Output:**
 
-Analyzes how different prompt lengths (Short, Medium, Long) affect Time-to-First-Token (TTFT) and Total Latency.
+- `results/table4_visual_token_efficiency.png`
+
+**Configurations tested:**
+| Encoder | Resolution | Visual Tokens |
+|---------|------------|---------------|
+| FastViT-HD | 256px | 16 |
+| ConvNeXt-L | 320px | 100 |
+| FastViT-HD | 512px | 64 |
+| FastViT-HD | 768px | 144 |
+| ConvNeXt-L | 512px | 256 |
+| FastViT-HD | 1024px | 256 |
+
+---
+
+### Table 5: FastViT-HD Visual Token Scaling
+
+Measures how accuracy scales with resolution/visual tokens for FastViT-HD.
 
 ```bash
-python exp_prompt_length_effect.py \
-    --model-path ../checkpoints/llava-fastvithd_0.5b_stage3 \
-    --device cuda \
-    --num-samples 20
+# Full dataset
+python exp_table5.py --model-path ../checkpoints/llava-fastvithd_0.5b_stage3 --device cuda
+
+# Quick test
+python exp_table5.py --model-path ../checkpoints/llava-fastvithd_0.5b_stage3 --device cuda --num-samples 10
 ```
 
-## Configuration Options
+**Output:**
 
-All scripts support these common arguments:
+- `results/table5_fastvithd_efficiency.png`
 
-| Argument        | Description               | Default  |
-| --------------- | ------------------------- | -------- |
-| `--model-path`  | Path to model checkpoint  | Required |
-| `--device`      | Device (cuda/cpu)         | `cuda`   |
-| `--num-samples` | Number of TextVQA samples | `20`     |
+**Resolutions tested:** 256, 512, 768, 1024px
 
-### Stage Comparison Specific:
+**Visual token formula:** `(resolution / 64)^2`
 
-- `--stage2-path`: Path to Stage 2 model
-- `--stage3-path`: Path to Stage 3 model
+---
 
-The scripts are optimized for RTX 4070 8GB:
+### Figure 5: Vision vs LLM Prefilling Latency
 
-- **FP16 precision**: `torch_dtype=torch.float16`
-- **CUDA events**: Precise GPU timing
-- **Memory cleanup**: `torch.cuda.empty_cache()` between runs
-- **Smart loading**: `low_cpu_mem_usage=True`
+Measures vision encoder latency and LLM prefilling latency separately (excludes token generation).
 
-- Time-to-First-Token (TTFT)
-- Total Latency
-- Prompt Tokens count
+```bash
+# Full dataset
+python exp_figure5.py --model-path ../checkpoints/llava-fastvithd_0.5b_stage3 --device cuda
 
-## Reproducing Paper Results
+# Quick test
+python exp_figure5.py --model-path ../checkpoints/llava-fastvithd_0.5b_stage3 --device cuda --num-samples 10
+```
 
-The experiments are designed to reproduce key findings from FastVLM CVPR 2025 using the **TextVQA** benchmark:
+**Output:**
 
-| Experiment Script              | Paper Figure(s) / Table(s) | Description / Purpose                                                                | Models Used                                                  | Comparison Models  | Benchmarks    |
-| :----------------------------- | :------------------------- | :----------------------------------------------------------------------------------- | :----------------------------------------------------------- | :----------------- | :------------ |
-| `exp_resolution_scaling.py`    | Fig. 3, Fig. 4, Table 4    | Tests Latency & VRAM across resolutions (224-1024px).                                | `llava-fastvithd_0.5b_stage3`                                | N/A                | TextVQA (Val) |
-| `exp_token_budget_ablation.py` | Table 5                    | Evaluates Accuracy vs Latency trade-off for different token budgets (16-576 tokens). | `llava-fastvithd_0.5b_stage3`                                | N/A                | TextVQA (Val) |
-| `exp_stage_comparison.py`      | Table 6                    | Compares Stage 2 vs Stage 3 performance (Accuracy & Latency).                        | `llava-fastvithd_0.5b_stage2`, `llava-fastvithd_0.5b_stage3` | Stage 2 vs Stage 3 | TextVQA (Val) |
-| `exp_prompt_length_effect.py`  | Fig. 5                     | Measures impact of prompt length (Short/Medium/Long) on Latency & TTFT.              | `llava-fastvithd_0.5b_stage3`                                | N/A                | TextVQA (Val) |
+- `results/resolution_scaling_textvqa.csv`
+- `results/plots/figure5_resolution_scaling.png`
+
+**Resolutions tested:** 256, 512, 768, 1024, 1536px
+
+**Metrics:**
+
+- Vision Latency (ms): Time for vision encoder forward pass
+- LLM Prefill Latency (ms): Time for LLM to process visual tokens
+
+---
+
+## Common Arguments
+
+| Argument        | Description                                   | Default                                      |
+| --------------- | --------------------------------------------- | -------------------------------------------- |
+| `--model-path`  | Path to FastVLM checkpoint                    | `../checkpoints/llava-fastvithd_0.5b_stage3` |
+| `--device`      | Device (`cuda` or `cpu`)                      | `cuda`                                       |
+| `--num-samples` | Samples per benchmark (omit for full dataset) | `None`                                       |
+
+## Output Structure
+
+```
+results/
+    table3_encoder_comparison.png
+    table4_visual_token_efficiency.png
+    table5_fastvithd_efficiency.png
+    resolution_scaling_textvqa.csv
+    plots/
+        figure5_resolution_scaling.png
+```
+
+## Hardware Notes
+
+Scripts are optimized for NVIDIA GPUs:
+
+- FP16 precision (`torch.float16`)
+- CUDA event timing for accurate latency measurement
+- Memory cleanup between runs
+
+See `limitations.md` for detailed notes on replication limitations and hardware differences from the original paper.
+
+## Datasets
+
+| Dataset | Source             | Split      |
+| ------- | ------------------ | ---------- |
+| TextVQA | `lmms-lab/textvqa` | validation |
+| DocVQA  | `lmms-lab/DocVQA`  | validation |
+
+Datasets are streamed from HuggingFace and do not require local download.
 
 ## Citation
 
 ```bibtex
 @inproceedings{fastvlm2025,
-  title={FastVLM: Efficient Vision-Language Model Inference via Token Reduction},
-  author={Authors et al.},
+  title={FastVLM: Efficient Vision Encoding for Vision Language Models},
+  author={Pavan Kumar Anasosalu Vasu, Fartash Faghri, Chun-Liang Li, Cem Koc, Nate True, Albert Antony, Gokul Santhanam, James Gabriel, Peter Grasch, Oncel Tuzel, Hadi Pouransari},
   booktitle={CVPR},
   year={2025}
 }

@@ -33,13 +33,15 @@ from llava.mm_utils import get_model_name_from_path, process_images, tokenizer_i
 from llava.model.builder import load_pretrained_model
 from llava.utils import disable_torch_init
 
+import argparse
+
 from utils_dataset import get_benchmark_dataset
 from utils_plot import save_table_image
 
 # ---------------- CONFIG ---------------- #
 
-# Model checkpoint path
-MODEL_PATH = "../checkpoints/llava-fastvithd_0.5b_stage3"
+# Model checkpoint path (default, can be overridden via args)
+DEFAULT_MODEL_PATH = "../checkpoints/llava-fastvithd_0.5b_stage3"
 
 # Format: (encoder_name, display_name, resolution, downsample_factor)
 # Downsample factors from paper: ConvNeXt=32x, FastViT-HD=64x
@@ -59,8 +61,9 @@ BENCHMARKS = [
     # ("gqa", "GQA"),  # Disabled - lmms-lab/GQA requires joining separate image and instruction configs
 ]
 
-# Set to None to use full dataset, or a number for quick testing
-MAX_SAMPLES: Optional[int] = 10
+# Default: None = use full dataset, or a number for quick testing
+# Can be overridden via --num-samples argument
+MAX_SAMPLES: Optional[int] = None
 
 N_WARMUP = 3
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -384,6 +387,28 @@ def save_table_as_image(results: List[Dict[str, Any]]):
 # ---------------- ENTRY POINT ---------------- #
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="FastVLM Table 4 Replication: Visual Token Efficiency"
+    )
+    parser.add_argument(
+        "--model-path",
+        default=DEFAULT_MODEL_PATH,
+        help="Path to FastVLM checkpoint",
+    )
+    parser.add_argument("--device", default="cuda")
+    parser.add_argument(
+        "--num-samples",
+        type=int,
+        default=None,
+        help="Samples per benchmark (default: full dataset)",
+    )
+    args = parser.parse_args()
+
+    # Override module-level config with args
+    MODEL_PATH = args.model_path
+    MAX_SAMPLES = args.num_samples
+    DEVICE = args.device
+
     results = benchmark_table4()
     print_table(results)
     save_table_as_image(results)

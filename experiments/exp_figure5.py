@@ -324,7 +324,10 @@ if __name__ == "__main__":
     )
     parser.add_argument("--device", default="cuda")
     parser.add_argument(
-        "--num-samples", type=int, default=20, help="Samples per resolution"
+        "--num-samples",
+        type=int,
+        default=None,
+        help="Samples per resolution (default: full dataset)"
     )
     args = parser.parse_args()
     run_experiment(args)
