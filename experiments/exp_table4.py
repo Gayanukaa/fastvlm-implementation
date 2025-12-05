@@ -48,10 +48,10 @@ DEFAULT_MODEL_PATH = "../checkpoints/llava-fastvithd_0.5b_stage3"
 # Order matches paper Table 4
 ENCODER_CONFIGS: List[Tuple[str, str, int, int]] = [
     ("fastvit", "FastViT-HD", 256, 64),   # 16 tokens
-    ("convnext", "ConvNeXt-L", 320, 32),  # 100 tokens
+    # ("convnext", "ConvNeXt-L", 320, 32),  # 100 tokens
     ("fastvit", "FastViT-HD", 512, 64),   # 64 tokens
     ("fastvit", "FastViT-HD", 768, 64),   # 144 tokens
-    ("convnext", "ConvNeXt-L", 512, 32),  # 256 tokens
+    # ("convnext", "ConvNeXt-L", 512, 32),  # 256 tokens
     ("fastvit", "FastViT-HD", 1024, 64),  # 256 tokens
 ]
 
