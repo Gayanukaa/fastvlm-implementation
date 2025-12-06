@@ -5,6 +5,7 @@ import threading
 import torch
 import gradio as gr
 from PIL import Image
+from collections import deque
 
 # Add parent directory to path to import llava
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -23,143 +24,245 @@ current_model_name = None
 is_generating_live = False
 last_live_output = ""
 
+# Performance tracking (inspired by macOS app metrics)
+performance_history = deque(maxlen=30)  # Store last 30 inference times
+frame_skip_counter = 0
+
+# Cached tensors for efficiency
+cached_prompt_ids = None
+cached_prompt_text = None
+
 MODELS = {
     "Stage 2 (0.5B)": "../checkpoints/llava-fastvithd_0.5b_stage2",
     "Stage 3 (0.5B)": "../checkpoints/llava-fastvithd_0.5b_stage3"
 }
 
+# Preset prompts (similar to macOS app's prompt options)
+PRESET_PROMPTS = {
+    "Describe": "Describe what you see briefly.",
+    "Count Objects": "Count the main objects visible.",
+    "Read Text": "Read any text visible in the image.",
+    "Identify": "What is the main subject?",
+    "Action": "What action is happening?",
+    "Custom": ""
+}
+
+
+def get_device():
+    """Get the best available device."""
+    if torch.cuda.is_available():
+        return "cuda"
+    elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+        return "mps"
+    return "cpu"
+
 def load_model_fn(model_choice):
     global tokenizer, model, image_processor, context_len, current_model_name
+    global cached_prompt_ids, cached_prompt_text
 
     model_path = os.path.abspath(os.path.join(os.path.dirname(__file__), MODELS[model_choice]))
 
     if current_model_name == model_choice:
-        return f"Model {model_choice} already loaded."
+        return f"✅ Model {model_choice} already loaded."
 
     print(f"Loading {model_choice} from {model_path}...")
     try:
         # Unload previous model if exists to save VRAM
         if model is not None:
             del model
-            torch.cuda.empty_cache()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+
+        # Clear prompt cache
+        cached_prompt_ids = None
+        cached_prompt_text = None
 
         model_name = get_model_name_from_path(model_path)
+        device = get_device()
+
         tokenizer, model, image_processor, context_len = load_pretrained_model(
             model_path=model_path,
             model_base=None,
             model_name=model_name,
-            device="cuda" if torch.cuda.is_available() else "cpu"
+            device=device
         )
+
+        # Optimize model for inference
+        model.eval()
+        if device == "cuda":
+            # Enable TF32 for faster computation on Ampere+ GPUs
+            torch.backends.cuda.matmul.allow_tf32 = True
+            torch.backends.cudnn.allow_tf32 = True
 
         # Set the pad token id for generation
         if tokenizer.pad_token_id is not None:
             model.generation_config.pad_token_id = tokenizer.pad_token_id
 
         current_model_name = model_choice
-        return f"Successfully loaded {model_choice}"
+        return f"✅ Loaded {model_choice} on {device.upper()}"
     except Exception as e:
-        return f"Error loading model: {str(e)}"
+        return f"❌ Error loading model: {str(e)}"
 
-def live_inference(image, prompt, temperature, top_p):
+def prepare_prompt(prompt):
+    """Prepare and cache the prompt tokens."""
+    global cached_prompt_ids, cached_prompt_text
+
+    # Use cached prompt if same
+    if cached_prompt_text == prompt and cached_prompt_ids is not None:
+        return cached_prompt_ids.clone()
+
+    qs = prompt
+    if model.config.mm_use_im_start_end:
+        qs = DEFAULT_IM_START_TOKEN + DEFAULT_IMAGE_TOKEN + DEFAULT_IM_END_TOKEN + '\n' + qs
+    else:
+        qs = DEFAULT_IMAGE_TOKEN + '\n' + qs
+
+    from llava.conversation import conv_templates
+    conv_mode = "qwen_2"
+    conv = conv_templates[conv_mode].copy()
+    conv.append_message(conv.roles[0], qs)
+    conv.append_message(conv.roles[1], None)
+    prompt_str = conv.get_prompt()
+
+    input_ids = tokenizer_image_token(prompt_str, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(0).to(model.device)
+
+    # Cache for reuse
+    cached_prompt_text = prompt
+    cached_prompt_ids = input_ids
+
+    return input_ids
+
+
+def live_inference(image, prompt, temperature, top_p, frame_skip):
     global is_generating_live, last_live_output, model, tokenizer, image_processor
+    global frame_skip_counter, performance_history
 
     if image is None:
-        return last_live_output, "⏸️ Waiting for webcam..."
+        return last_live_output, "⏸️ Waiting for webcam...", get_performance_stats()
 
     if model is None:
-        return "⚠️ Model not loaded. Please load a model in the Chat tab.", "❌ Model not loaded"
+        return "⚠️ Model not loaded.", "❌ Model not loaded", ""
 
-    # If busy, skip this frame and return previous result
+    # Frame skipping for smoother experience (inspired by macOS app)
+    frame_skip_counter += 1
+    if frame_skip_counter < frame_skip:
+        return last_live_output, f"⏭️ Skipping frame ({frame_skip_counter}/{frame_skip})", get_performance_stats()
+    frame_skip_counter = 0
+
+    # If busy, skip this frame
     if is_generating_live:
-        return last_live_output, "⏳ Processing previous frame..."
+        return last_live_output, "⏳ Processing...", get_performance_stats()
 
     is_generating_live = True
 
     try:
-        # Prepare prompt
-        qs = prompt
-        if model.config.mm_use_im_start_end:
-            qs = DEFAULT_IM_START_TOKEN + DEFAULT_IMAGE_TOKEN + DEFAULT_IM_END_TOKEN + '\n' + qs
-        else:
-            qs = DEFAULT_IMAGE_TOKEN + '\n' + qs
-
-        from llava.conversation import conv_templates
-        conv_mode = "qwen_2"
-        conv = conv_templates[conv_mode].copy()
-        conv.append_message(conv.roles[0], qs)
-        conv.append_message(conv.roles[1], None)
-        prompt_str = conv.get_prompt()
-
-        # Tokenize
         start_time = time.time()
-        input_ids = tokenizer_image_token(prompt_str, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(0).to(model.device)
 
-        # Process Image
+        # Use cached prompt tokens
+        input_ids = prepare_prompt(prompt)
+
+        # Process Image with optimizations
         image_tensor = process_images([image], image_processor, model.config)[0]
 
-        # Generate with stricter parameters for live video
+        # Generate with optimized parameters
         with torch.inference_mode():
             output_ids = model.generate(
                 inputs=input_ids,
                 images=image_tensor.unsqueeze(0).half(),
                 image_sizes=[image.size],
-                do_sample=False,  # Greedy decoding for consistency
-                max_new_tokens=30,  # Reduced for faster, cleaner output
+                do_sample=False,
+                max_new_tokens=25,  # Even shorter for live
+                min_new_tokens=3,   # Ensure some output
                 use_cache=True,
-                repetition_penalty=1.2,  # Penalize repetition
+                repetition_penalty=1.3,
+                no_repeat_ngram_size=3,  # Prevent 3-gram repetitions
                 eos_token_id=tokenizer.eos_token_id,
             )
 
-        # Decode the generated tokens
+        # Decode
         output_text = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0].strip()
-
-        # Clean up the output - extract only the first sentence/response
         output_text = clean_live_output(output_text)
 
-        # Debug: print to console
-        print(f"Generated text: '{output_text}' (length: {len(output_text)})")
+        # Track performance
+        inference_time = (time.time() - start_time) * 1000
+        performance_history.append(inference_time)
 
-        # Update last output even if empty (to show we processed)
+        print(f"[{inference_time:.0f}ms] {output_text}")
+
         if output_text:
             last_live_output = output_text
         else:
-            output_text = "[No text generated]"
+            output_text = "[No output]"
 
-        # Calculate processing time
-        processing_time = (time.time() - start_time) * 1000
-        status = f"✅ Processed in {processing_time:.0f}ms"
-
-        return output_text, status
+        status = f"✅ {inference_time:.0f}ms"
+        return output_text, status, get_performance_stats()
 
     except Exception as e:
         print(f"Live inference error: {e}")
-        error_msg = f"Error: {str(e)[:100]}"
-        return error_msg, "❌ Error occurred"
+        return f"Error: {str(e)[:50]}", "❌ Error", get_performance_stats()
     finally:
         is_generating_live = False
+
+
+def get_performance_stats():
+    """Get performance statistics like macOS app."""
+    if not performance_history:
+        return "**Stats:** No data yet"
+
+    avg_time = sum(performance_history) / len(performance_history)
+    min_time = min(performance_history)
+    max_time = max(performance_history)
+    fps = 1000 / avg_time if avg_time > 0 else 0
+
+    return f"**Avg:** {avg_time:.0f}ms | **Min:** {min_time:.0f}ms | **Max:** {max_time:.0f}ms | **~FPS:** {fps:.1f}"
 
 
 def clean_live_output(text):
     """Clean up model output for live video display."""
     # Remove common repetitive patterns
-    if "Answer:" in text:
-        text = text.split("Answer:")[0].strip()
-    
+    for pattern in ["Answer:", "Response:", "Output:", "Description:"]:
+        if pattern in text:
+            text = text.split(pattern)[0].strip()
+
     # Remove code blocks
     if "```" in text:
         text = text.split("```")[0].strip()
-    
-    # Take only the first sentence if multiple exist
-    for delimiter in ['\n\n', '\n']:
+
+    # Remove markdown artifacts
+    text = text.replace("**", "").replace("*", "")
+
+    # Take only first line/sentence
+    for delimiter in ['\n\n', '\n', '. ']:
         if delimiter in text:
-            text = text.split(delimiter)[0].strip()
+            parts = text.split(delimiter)
+            text = parts[0].strip()
+            if delimiter == '. ' and text:
+                text += '.'
             break
-    
+
+    # Remove incomplete sentences at the end
+    if text and text[-1] not in '.!?':
+        last_space = text.rfind(' ')
+        if last_space > len(text) * 0.7:  # Only trim if near the end
+            text = text[:last_space] + "..."
+
     # Limit length
-    if len(text) > 150:
-        text = text[:150].rsplit(' ', 1)[0] + "..."
-    
+    if len(text) > 120:
+        text = text[:120].rsplit(' ', 1)[0] + "..."
+
     return text
+
+
+def update_prompt_from_preset(preset_choice):
+    """Update prompt textbox based on preset selection."""
+    return PRESET_PROMPTS.get(preset_choice, "")
+
+
+def reset_performance():
+    """Reset performance tracking."""
+    global performance_history
+    performance_history.clear()
+    return "**Stats:** Reset"
 
 
 def chat(message, history, image, temperature, top_p):
@@ -197,29 +300,18 @@ def chat(message, history, image, temperature, top_p):
     # Streamer
     streamer = TextIteratorStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
 
-    # Only use sampling parameters if temperature > 0
-    if temperature > 0:
-        generation_kwargs = dict(
-            inputs=input_ids,
-            images=image_tensor.unsqueeze(0).half(),
-            image_sizes=[image.size],
-            do_sample=True,
-            temperature=temperature,
-            top_p=top_p,
-            max_new_tokens=256,
-            streamer=streamer,
-            use_cache=True
-        )
-    else:
-        generation_kwargs = dict(
-            inputs=input_ids,
-            images=image_tensor.unsqueeze(0).half(),
-            image_sizes=[image.size],
-            do_sample=False,
-            max_new_tokens=256,
-            streamer=streamer,
-            use_cache=True
-        )
+    generation_kwargs = dict(
+        inputs=input_ids,
+        images=image_tensor.unsqueeze(0).half(),
+        image_sizes=[image.size],
+        do_sample=temperature > 0,
+        temperature=temperature if temperature > 0 else None,
+        top_p=top_p if temperature > 0 else None,
+        max_new_tokens=256,
+        streamer=streamer,
+        use_cache=True,
+        repetition_penalty=1.1,
+    )
 
     # Run generation in a separate thread
     thread = threading.Thread(target=model.generate, kwargs=generation_kwargs)
@@ -244,51 +336,90 @@ def chat(message, history, image, temperature, top_p):
         total_time = current_time - start_time
         tps = token_count / total_time if total_time > 0 else 0
 
-        metrics = f"**TTFT:** {ttft:.2f} ms | **TPS:** {tps:.2f} tokens/s"
+        metrics = f"**TTFT:** {ttft:.0f}ms | **Speed:** {tps:.1f} tok/s | **Tokens:** {token_count}"
 
         yield generated_text, metrics
 
     thread.join()
 
 # UI Construction
-with gr.Blocks(title="FastVLM Windows Inference") as demo:
-    gr.Markdown("# FastVLM Windows Inference Engine")
+with gr.Blocks(title="FastVLM Inference", theme=gr.themes.Soft()) as demo:
+    gr.Markdown("# 🍎 FastVLM Inference Engine")
+    gr.Markdown("*Efficient Vision-Language Model for real-time inference*")
 
     with gr.Row():
         with gr.Column(scale=1):
-            model_dropdown = gr.Dropdown(choices=list(MODELS.keys()), label="Select Model", value="Stage 2 (0.5B)")
-            load_btn = gr.Button("Load Model")
-            load_status = gr.Textbox(label="Status", interactive=False)
+            gr.Markdown("### ⚙️ Settings")
+            model_dropdown = gr.Dropdown(
+                choices=list(MODELS.keys()),
+                label="Model",
+                value="Stage 3 (0.5B)"
+            )
+            load_btn = gr.Button("🔄 Load Model", variant="primary")
+            load_status = gr.Textbox(label="Status", interactive=False, value="No model loaded")
 
-            temperature = gr.Slider(minimum=0.0, maximum=1.0, value=0.0, label="Temperature")
-            top_p = gr.Slider(minimum=0.0, maximum=1.0, value=0.7, label="Top P")
+            gr.Markdown("### 🎛️ Generation")
+            temperature = gr.Slider(0.0, 1.0, value=0.0, step=0.1, label="Temperature (0=deterministic)")
+            top_p = gr.Slider(0.0, 1.0, value=0.9, step=0.1, label="Top P")
 
         with gr.Column(scale=2):
             with gr.Tabs():
-                with gr.Tab("Chat"):
+                with gr.Tab("💬 Chat"):
                     image_input = gr.Image(type="pil", label="Upload Image")
-                    chatbot = gr.Chatbot(label="Chat", type="tuples")
-                    msg = gr.Textbox(label="Message")
-                    clear = gr.Button("Clear")
-                    metrics_display = gr.Markdown("**TTFT:** - | **TPS:** -")
+                    chatbot = gr.Chatbot(label="Conversation", height=300, type="tuples")
+                    msg = gr.Textbox(label="Your Question", placeholder="Ask about the image...")
+                    with gr.Row():
+                        clear = gr.Button("🗑️ Clear")
+                        submit_btn = gr.Button("Send", variant="primary")
+                    metrics_display = gr.Markdown("**TTFT:** - | **Speed:** - | **Tokens:** -")
 
-                with gr.Tab("Live Video"):
-                    gr.Markdown("### Real-time Video Inference")
-                    gr.Markdown("💡 **Tip:** The model will continuously analyze webcam frames. Load a model first in the Chat tab.")
-                    live_image_input = gr.Image(sources=["webcam"], streaming=True, type="pil", label="Live Camera")
-                    live_prompt = gr.Textbox(label="Prompt", value="Describe the image in English. Output should be brief, about 15 words or less.")
-                    live_output = gr.Textbox(label="Live Output", lines=3)
-                    live_status = gr.Textbox(label="Status", value="⏸️ Waiting...", interactive=False)
+                with gr.Tab("📹 Live Video"):
+                    gr.Markdown("### Real-time Video Analysis")
+
+                    with gr.Row():
+                        with gr.Column(scale=2):
+                            live_image_input = gr.Image(
+                                sources=["webcam"],
+                                streaming=True,
+                                type="pil",
+                                label="Camera Feed"
+                            )
+                        with gr.Column(scale=1):
+                            preset_dropdown = gr.Dropdown(
+                                choices=list(PRESET_PROMPTS.keys()),
+                                label="Quick Prompts",
+                                value="Describe"
+                            )
+                            live_prompt = gr.Textbox(
+                                label="Prompt",
+                                value="Describe what you see briefly.",
+                                lines=2
+                            )
+                            frame_skip = gr.Slider(
+                                1, 10, value=3, step=1,
+                                label="Frame Skip (higher = smoother but slower updates)"
+                            )
+
+                    live_output = gr.Textbox(label="📝 Output", lines=2, max_lines=3)
+
+                    with gr.Row():
+                        live_status = gr.Textbox(label="Status", value="⏸️ Waiting...", interactive=False, scale=1)
+                        reset_btn = gr.Button("🔄 Reset Stats", scale=1)
+
+                    performance_display = gr.Markdown("**Stats:** No data yet")
 
     # Event handlers
     load_btn.click(load_model_fn, inputs=[model_dropdown], outputs=[load_status])
 
-    # Live Video Event - triggers on every new frame from webcam
+    preset_dropdown.change(update_prompt_from_preset, inputs=[preset_dropdown], outputs=[live_prompt])
+    reset_btn.click(reset_performance, outputs=[performance_display])
+
+    # Live Video streaming
     live_image_input.stream(
         live_inference,
-        inputs=[live_image_input, live_prompt, temperature, top_p],
-        outputs=[live_output, live_status],
-        show_progress=False
+        inputs=[live_image_input, live_prompt, temperature, top_p, frame_skip],
+        outputs=[live_output, live_status, performance_display],
+        show_progress="hidden"
     )
 
     def user(user_message, history):
@@ -297,10 +428,7 @@ with gr.Blocks(title="FastVLM Windows Inference") as demo:
     def bot(history, image, temperature, top_p):
         if not history:
             return history, ""
-
         user_message = history[-1][0]
-
-        # Call chat generator
         for partial_response, metrics in chat(user_message, history, image, temperature, top_p):
             history[-1][1] = partial_response
             yield history, metrics
@@ -308,8 +436,10 @@ with gr.Blocks(title="FastVLM Windows Inference") as demo:
     msg.submit(user, [msg, chatbot], [msg, chatbot], queue=False).then(
         bot, [chatbot, image_input, temperature, top_p], [chatbot, metrics_display]
     )
-
-    clear.click(lambda: None, None, chatbot, queue=False)
+    submit_btn.click(user, [msg, chatbot], [msg, chatbot], queue=False).then(
+        bot, [chatbot, image_input, temperature, top_p], [chatbot, metrics_display]
+    )
+    clear.click(lambda: (None, []), outputs=[image_input, chatbot], queue=False)
 
 if __name__ == "__main__":
-    demo.queue().launch()
+    demo.queue().launch(share=False)
