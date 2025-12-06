@@ -24,8 +24,8 @@ current_model_name = None
 is_generating_live = False
 last_live_output = ""
 
-# Performance tracking (inspired by macOS app metrics)
-performance_history = deque(maxlen=30)  # Store last 30 inference times
+# Performance tracking
+performance_history = deque(maxlen=30)
 frame_skip_counter = 0
 
 # Cached tensors for efficiency
@@ -37,7 +37,7 @@ MODELS = {
     "Stage 3 (0.5B)": "../checkpoints/llava-fastvithd_0.5b_stage3"
 }
 
-# Preset prompts (similar to macOS app's prompt options)
+# Preset prompts
 PRESET_PROMPTS = {
     "Describe": "Describe what you see briefly.",
     "Count Objects": "Count the main objects visible.",
@@ -87,10 +87,8 @@ def load_model_fn(model_choice):
             device=device
         )
 
-        # Optimize model for inference
         model.eval()
         if device == "cuda":
-            # Enable TF32 for faster computation on Ampere+ GPUs
             torch.backends.cuda.matmul.allow_tf32 = True
             torch.backends.cudnn.allow_tf32 = True
 
@@ -143,7 +141,7 @@ def live_inference(image, prompt, temperature, top_p, frame_skip):
     if model is None:
         return "⚠️ Model not loaded.", "❌ Model not loaded", ""
 
-    # Frame skipping for smoother experience (inspired by macOS app)
+    # Frame skipping for smoother experience
     frame_skip_counter += 1
     if frame_skip_counter < frame_skip:
         return last_live_output, f"⏭️ Skipping frame ({frame_skip_counter}/{frame_skip})", get_performance_stats()
@@ -164,18 +162,17 @@ def live_inference(image, prompt, temperature, top_p, frame_skip):
         # Process Image with optimizations
         image_tensor = process_images([image], image_processor, model.config)[0]
 
-        # Generate with optimized parameters
         with torch.inference_mode():
             output_ids = model.generate(
                 inputs=input_ids,
                 images=image_tensor.unsqueeze(0).half(),
                 image_sizes=[image.size],
                 do_sample=False,
-                max_new_tokens=25,  # Even shorter for live
-                min_new_tokens=3,   # Ensure some output
+                max_new_tokens=32,
+                min_new_tokens=3,
                 use_cache=True,
                 repetition_penalty=1.3,
-                no_repeat_ngram_size=3,  # Prevent 3-gram repetitions
+                no_repeat_ngram_size=3,
                 eos_token_id=tokenizer.eos_token_id,
             )
 
@@ -205,7 +202,7 @@ def live_inference(image, prompt, temperature, top_p, frame_skip):
 
 
 def get_performance_stats():
-    """Get performance statistics like macOS app."""
+    """Get performance statistics."""
     if not performance_history:
         return "**Stats:** No data yet"
 
@@ -307,7 +304,7 @@ def chat(message, history, image, temperature, top_p):
         do_sample=temperature > 0,
         temperature=temperature if temperature > 0 else None,
         top_p=top_p if temperature > 0 else None,
-        max_new_tokens=256,
+        max_new_tokens=128,
         streamer=streamer,
         use_cache=True,
         repetition_penalty=1.1,
@@ -343,7 +340,7 @@ def chat(message, history, image, temperature, top_p):
     thread.join()
 
 # UI Construction
-with gr.Blocks(title="FastVLM Inference", theme=gr.themes.Soft()) as demo:
+with gr.Blocks(title="FastVLM Inference", theme=gr.themes.Default(primary_hue="orange", secondary_hue="yellow")) as demo:
     gr.Markdown("# 🍎 FastVLM Inference Engine")
     gr.Markdown("*Efficient Vision-Language Model for real-time inference*")
 
