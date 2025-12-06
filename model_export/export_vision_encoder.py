@@ -2,18 +2,18 @@
 # For licensing see accompanying LICENSE file.
 # Copyright (C) 2025 Apple Inc. All Rights Reserved.
 #
-import os
-import json
-import copy
 import argparse
+import copy
+import json
+import os
 
-import torch
-import numpy as np
 import coremltools
+import numpy as np
+import torch
 
+from llava.mm_utils import get_model_name_from_path
 from llava.model.builder import load_pretrained_model
 from llava.utils import disable_torch_init
-from llava.mm_utils import get_model_name_from_path
 
 
 def export(args):
@@ -21,10 +21,9 @@ def export(args):
     disable_torch_init()
     model_path = os.path.expanduser(args.model_path)
     model_name = get_model_name_from_path(model_path)
-    tokenizer, model, image_processor, context_len = load_pretrained_model(model_path,
-                                                                           args.model_base,
-                                                                           model_name,
-                                                                           device="mps")
+    tokenizer, model, image_processor, context_len = load_pretrained_model(
+        model_path, args.model_base, model_name, device="mps"
+    )
 
     # Save extra metadata that is not saved during LLaVA training
     # required by HF for auto-loading model and for mlx-vlm preprocessing
@@ -45,10 +44,10 @@ def export(args):
 
     # Modify tokenizer to include <image> special token.
     tokenizer_config_path = os.path.join(model_path, "tokenizer_config.json")
-    tokenizer_config = json.load(open(tokenizer_config_path, 'r'))
+    tokenizer_config = json.load(open(tokenizer_config_path, "r"))
     token_ids = list()
     image_token_is_present = False
-    for k, v in tokenizer_config['added_tokens_decoder'].items():
+    for k, v in tokenizer_config["added_tokens_decoder"].items():
         token_ids.append(int(k))
         if v["content"] == "<image>":
             image_token_is_present = True
@@ -56,19 +55,22 @@ def export(args):
 
     # Append only if <image> token is not present
     if not image_token_is_present:
-        tokenizer_config['added_tokens_decoder'][f'{max(token_ids) + 1}'] = copy.deepcopy(
-            tokenizer_config['added_tokens_decoder'][f'{token_ids[0]}'])
-        tokenizer_config['added_tokens_decoder'][f'{max(token_ids) + 1}']["content"] = "<image>"
-        json.dump(tokenizer_config, open(tokenizer_config_path, 'w'), indent=2)
+        tokenizer_config["added_tokens_decoder"][f"{max(token_ids) + 1}"] = (
+            copy.deepcopy(tokenizer_config["added_tokens_decoder"][f"{token_ids[0]}"])
+        )
+        tokenizer_config["added_tokens_decoder"][f"{max(token_ids) + 1}"][
+            "content"
+        ] = "<image>"
+        json.dump(tokenizer_config, open(tokenizer_config_path, "w"), indent=2)
 
     # Modify config to contain token id for <image>
     config_path = os.path.join(model_path, "config.json")
-    model_config = json.load(open(config_path, 'r'))
+    model_config = json.load(open(config_path, "r"))
     model_config["image_token_index"] = max(token_ids) + 1
-    json.dump(model_config, open(config_path, 'w'), indent=2)
+    json.dump(model_config, open(config_path, "w"), indent=2)
 
     # Export the vision encoder to CoreML
-    image_res = image_processor.to_dict()['size']['shortest_edge']
+    image_res = image_processor.to_dict()["size"]["shortest_edge"]
     inputs = torch.rand(1, 3, image_res, image_res)
     inputs_tensor = [
         coremltools.TensorType(
@@ -91,7 +93,7 @@ def export(args):
         debug=False,
         compute_units=coremltools.ComputeUnit.CPU_AND_GPU,
         minimum_deployment_target=coremltools.target.iOS16,
-        compute_precision=coremltools.precision.FLOAT32
+        compute_precision=coremltools.precision.FLOAT32,
     )
     ml_model_path = os.path.join(model_path, "fastvithd.mlpackage")
     ml_model.save(ml_model_path)

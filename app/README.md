@@ -1,6 +1,6 @@
 # FastVLM
 
-Demonstrates the performance of **FastVLM** models for on-device, visual question answering. 
+Demonstrates the performance of **FastVLM** models for on-device, visual question answering.
 
 <table>
 <tr>
@@ -53,4 +53,4 @@ app/get_pretrained_mlx_model.sh --model 0.5b --dest app/FastVLM/model
 ### Custom Model
 
 In addition to pretrained sizes of FastVLM, you can further quantize or fine-tune FastVLM to best fit their needs. To learn more, check out our documentation on how to [`export the model`](../model_export#export-vlm).
-Please clear existing model in `app/FastVLM/model` before downloading or copying a new model. 
+Please clear existing model in `app/FastVLM/model` before downloading or copying a new model.

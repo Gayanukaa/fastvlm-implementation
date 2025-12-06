@@ -143,9 +143,12 @@ checkpoints/
 images/
 
 # Files and folders
+results/
 experiments/results/
 videos/
 fastvlm-windows-repro/
 swiftly-x86_64.tar.gz
 LICENSE.txt
 .swift-version
+experiments/old_results/
+encoder_models/

@@ -1,36 +1,46 @@
 #!/bin/bash
 # FastVLM Experiments Runner
-# Runs all ablation experiments sequentially and combines results
+# Runs all replication experiments for Tables 3, 4, 5 and Figure 5
 
-echo "🚀 FastVLM Experiments Suite"
-echo "==========================="
+set -e  # Exit on error
 
-# Set default paths (modify these as needed)
-STAGE2_PATH="${1:-../checkpoints/llava-fastvithd_0.5b_stage2}"
-STAGE3_PATH="${2:-../checkpoints/llava-fastvithd_0.5b_stage3}"
-IMAGE_FOLDER="${3:-../images}"
-DEVICE="${4:-cuda}"
+# Generate timestamp for log file
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+LOG_DIR="results/logs"
+mkdir -p "$LOG_DIR"
+LOG_FILE="$LOG_DIR/experiment_run_${TIMESTAMP}.log"
 
-echo "📂 Configuration:"
-echo "  Stage 2 Model: $STAGE2_PATH"
-echo "  Stage 3 Model: $STAGE3_PATH"
-echo "  Images Folder: $IMAGE_FOLDER"
-echo "  Device: $DEVICE"
-echo ""
+# Function to log to both terminal and file
+log() {
+    echo "$@" | tee -a "$LOG_FILE"
+}
 
-# Check if required paths exist
-if [ ! -d "$STAGE2_PATH" ]; then
-    echo "❌ Error: Stage 2 model path not found: $STAGE2_PATH"
-    exit 1
+log "FastVLM Experiments Suite"
+log "======================================"
+log "Started: $(date)"
+log "Log file: $LOG_FILE"
+log ""
+
+# Set default paths (modify these or pass as arguments)
+MODEL_PATH="${1:-../checkpoints/llava-fastvithd_0.5b_stage3}"
+DEVICE="${2:-cuda}"
+NUM_SAMPLES="${3:-}"  # Leave empty for full dataset, or set a number for quick testing
+
+log "Configuration:"
+log "  Model Path: $MODEL_PATH"
+log "  Device: $DEVICE"
+if [ -z "$NUM_SAMPLES" ]; then
+    log "  Samples: FULL DATASET"
+    SAMPLES_ARG=""
+else
+    log "  Samples per Experiment: $NUM_SAMPLES"
+    SAMPLES_ARG="--num-samples $NUM_SAMPLES"
 fi
+log ""
 
-if [ ! -d "$STAGE3_PATH" ]; then
-    echo "❌ Error: Stage 3 model path not found: $STAGE3_PATH"
-    exit 1
-fi
-
-if [ ! -d "$IMAGE_FOLDER" ]; then
-    echo "❌ Error: Images folder not found: $IMAGE_FOLDER"
+# Check if required model path exists
+if [ ! -d "$MODEL_PATH" ]; then
+    log "Error: Model path not found: $MODEL_PATH"
     exit 1
 fi
 
@@ -38,169 +48,133 @@ fi
 mkdir -p results
 mkdir -p results/plots
 
-# Change to experiments directory
-cd experiments
+log "Starting experiments..."
+log ""
 
-echo "🧪 Starting experiments..."
-echo ""
+# ============================================================
+# Experiment 1: Table 3 - Encoder Comparison (no dataset needed)
+# ============================================================
+log "============================================================"
+log "[1/4] Running Table 3: Encoder Comparison Benchmark"
+log "      (ViT-L/14, ConvNeXt-L, FastViT-HD latency comparison)"
+log "============================================================"
+python exp_table3.py 2>&1 | tee -a "$LOG_FILE"
 
-# Experiment 1: Resolution Scaling
-echo "1️⃣ Running Resolution Scaling Experiment..."
-python exp_resolution_scaling.py \
-    --model-path "$STAGE3_PATH" \
-    --image-folder "$IMAGE_FOLDER" \
+if [ ${PIPESTATUS[0]} -eq 0 ]; then
+    log "Table 3 completed successfully"
+else
+    log "Table 3 failed"
+fi
+log ""
+
+# ============================================================
+# Experiment 2: Table 4 - Visual Token Efficiency
+# ============================================================
+log "============================================================"
+log "[2/4] Running Table 4: Visual Token Efficiency"
+log "      (FastViT-HD & ConvNeXt-L at various resolutions)"
+log "============================================================"
+python exp_table4.py \
+    --model-path "$MODEL_PATH" \
     --device "$DEVICE" \
-    --prompt "Describe this image in detail."
+    $SAMPLES_ARG 2>&1 | tee -a "$LOG_FILE"
 
-if [ $? -eq 0 ]; then
-    echo "✅ Resolution scaling completed"
+if [ ${PIPESTATUS[0]} -eq 0 ]; then
+    log "Table 4 completed successfully"
 else
-    echo "❌ Resolution scaling failed"
+    log "Table 4 failed"
 fi
-echo ""
+log ""
 
-# Experiment 2: Token Budget Ablation
-echo "2️⃣ Running Token Budget Ablation Experiment..."
-python exp_token_budget_ablation.py \
-    --model-path "$STAGE3_PATH" \
-    --image-folder "$IMAGE_FOLDER" \
+# ============================================================
+# Experiment 3: Table 5 - FastViT-HD Visual Token Scaling
+# ============================================================
+log "============================================================"
+log "[3/4] Running Table 5: FastViT-HD Visual Token Scaling"
+log "      (256, 512, 768, 1024px resolutions on TextVQA)"
+log "============================================================"
+python exp_table5.py \
+    --model-path "$MODEL_PATH" \
     --device "$DEVICE" \
-    --prompt "Describe this image in detail."
+    $SAMPLES_ARG 2>&1 | tee -a "$LOG_FILE"
 
-if [ $? -eq 0 ]; then
-    echo "✅ Token budget ablation completed"
+if [ ${PIPESTATUS[0]} -eq 0 ]; then
+    log "Table 5 completed successfully"
 else
-    echo "❌ Token budget ablation failed"
+    log "Table 5 failed"
 fi
-echo ""
+log ""
 
-# Experiment 3: Stage Comparison
-echo "3️⃣ Running Stage Comparison Experiment..."
-python exp_stage_comparison.py \
-    --stage2-path "$STAGE2_PATH" \
-    --stage3-path "$STAGE3_PATH" \
-    --image-folder "$IMAGE_FOLDER" \
-    --device "$DEVICE"
+# ============================================================
+# Experiment 4: Figure 5 - Vision vs LLM Prefilling Latency
+# ============================================================
+log "============================================================"
+log "[4/4] Running Figure 5: Vision Latency vs LLM Prefilling"
+log "      (Resolution scaling: 256, 512, 768, 1024, 1536px)"
+log "============================================================"
+python exp_figure5.py \
+    --model-path "$MODEL_PATH" \
+    --device "$DEVICE" \
+    $SAMPLES_ARG 2>&1 | tee -a "$LOG_FILE"
 
-if [ $? -eq 0 ]; then
-    echo "✅ Stage comparison completed"
+if [ ${PIPESTATUS[0]} -eq 0 ]; then
+    log "Figure 5 completed successfully"
 else
-    echo "❌ Stage comparison failed"
+    log "Figure 5 failed"
 fi
-echo ""
+log ""
 
-# Experiment 4: Prompt Length Effect
-echo "4️⃣ Running Prompt Length Effect Experiment..."
-python exp_prompt_length_effect.py \
-    --model-path "$STAGE3_PATH" \
-    --image-folder "$IMAGE_FOLDER" \
-    --device "$DEVICE"
+# ============================================================
+# Summary
+# ============================================================
+log "============================================================"
+log "Generating Summary..."
+log "============================================================"
 
-if [ $? -eq 0 ]; then
-    echo "✅ Prompt length effect completed"
-else
-    echo "❌ Prompt length effect failed"
-fi
-echo ""
-
-# Go back to root directory
-cd ..
-
-echo "📊 Combining results..."
-
-# Python script to combine CSV files
-python << EOF
-import pandas as pd
+# Generate summary of all results
+python << 'EOF' 2>&1 | tee -a "$LOG_FILE"
 import os
 from glob import glob
 
-# Find all CSV files in results directory
-csv_files = glob('results/*.csv')
-print(f"Found CSV files: {csv_files}")
+print("\nGenerated Output Files:")
+print("-" * 50)
 
-combined_data = {}
+# List CSV files
+csv_files = sorted(glob('results/*.csv'))
+if csv_files:
+    print("\nCSV Results:")
+    for f in csv_files:
+        size = os.path.getsize(f)
+        print(f"   {f} ({size} bytes)")
 
-for csv_file in csv_files:
-    if os.path.exists(csv_file):
-        try:
-            df = pd.read_csv(csv_file)
-            experiment_name = os.path.basename(csv_file).replace('.csv', '')
-            df['experiment'] = experiment_name
-            combined_data[experiment_name] = df
-            print(f"✅ Loaded {csv_file}: {len(df)} rows")
-        except Exception as e:
-            print(f"❌ Error loading {csv_file}: {e}")
+# List PNG files
+png_files = sorted(glob('results/plots/*.png'))
+if png_files:
+    print("\nPlots & Figures:")
+    for f in png_files:
+        size = os.path.getsize(f)
+        print(f"   {f} ({size} bytes)")
 
-if combined_data:
-    # Save individual experiment summaries
-    summary_path = 'results/experiment_summary.txt'
-    with open(summary_path, 'w') as f:
-        f.write("FastVLM Experiments Summary\\n")
-        f.write("=" * 50 + "\\n\\n")
+# List table images in results root
+table_imgs = sorted(glob('results/*.png'))
+if table_imgs:
+    print("\nTable Images:")
+    for f in table_imgs:
+        size = os.path.getsize(f)
+        print(f"   {f} ({size} bytes)")
 
-        for exp_name, df in combined_data.items():
-            f.write(f"{exp_name.upper()}:\\n")
-            f.write(f"  Rows: {len(df)}\\n")
-            f.write(f"  Columns: {list(df.columns)}\\n")
-
-            # Add experiment-specific summary
-            if 'total_latency_ms' in df.columns:
-                f.write(f"  Avg Latency: {df['total_latency_ms'].mean():.1f}ms\\n")
-            if 'ttft_ms' in df.columns:
-                f.write(f"  Avg TTFT: {df['ttft_ms'].mean():.1f}ms\\n")
-            if 'vram_used_gb' in df.columns:
-                f.write(f"  Avg VRAM: {df['vram_used_gb'].mean():.2f}GB\\n")
-
-            f.write("\\n")
-
-    print(f"📋 Summary saved: {summary_path}")
-
-    # Try to combine all data (if columns are compatible)
-    try:
-        # This might not work if column schemas are very different
-        all_data = pd.concat(combined_data.values(), ignore_index=True, sort=False)
-        combined_path = 'results/combined.csv'
-        all_data.to_csv(combined_path, index=False)
-        print(f"📊 Combined data saved: {combined_path}")
-    except Exception as e:
-        print(f"⚠️  Could not combine all data: {e}")
-        print("Individual CSV files are still available.")
-
-else:
-    print("❌ No CSV files found to combine")
+print("\n" + "=" * 50)
+print("All experiments completed!")
+print("=" * 50)
+print("\nSee experiments/limitations.md for replication notes.")
 EOF
 
-# Display results summary
-echo ""
-echo "📈 Results Summary:"
-echo "=================="
-
-if [ -f "results/experiment_summary.txt" ]; then
-    cat results/experiment_summary.txt
-else
-    echo "Summary file not found."
-fi
-
-echo ""
-echo "📁 Generated Files:"
-echo "  📊 CSV Results: results/*.csv"
-echo "  📈 Plots: results/plots/*.png"
-if [ -f "results/combined.csv" ]; then
-    echo "  📋 Combined: results/combined.csv"
-fi
-echo "  📝 Summary: results/experiment_summary.txt"
-
-echo ""
-echo "🎉 All experiments completed!"
-echo ""
-echo "📖 Usage:"
-echo "  ./run_all_experiments.sh [stage2_path] [stage3_path] [image_folder] [device]"
-echo ""
-echo "🚀 To view plots:"
-echo "  xdg-open results/plots/"
-
-# Try to open plots folder (if in GUI environment)
-if command -v xdg-open &> /dev/null; then
-    echo "🖼️  Opening plots folder..."
-    xdg-open results/plots/ 2>/dev/null || true
-fi
+log ""
+log "Finished: $(date)"
+log "FastVLM Experiment Suite Complete!"
+log ""
+log "Log saved to: $LOG_FILE"
+log ""
+log "Usage:"
+log "  Quick Test (10 samples):  ./run_all_experiments.sh ../checkpoints/llava-fastvithd_0.5b_stage3 cuda 10"
+log "  Full Dataset:             ./run_all_experiments.sh ../checkpoints/llava-fastvithd_0.5b_stage3 cuda"
