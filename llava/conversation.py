@@ -1,15 +1,13 @@
-import base64
 import dataclasses
-from enum import Enum, auto
-from io import BytesIO
+from enum import auto, Enum
 from typing import List, Tuple
-
+import base64
+from io import BytesIO
 from PIL import Image
 
 
 class SeparatorStyle(Enum):
     """Different separator style."""
-
     SINGLE = auto()
     TWO = auto()
     MPT = auto()
@@ -22,7 +20,6 @@ class SeparatorStyle(Enum):
 @dataclasses.dataclass
 class Conversation:
     """A class that keeps all conversation history."""
-
     system: str
     roles: List[str]
     messages: List[List[str]]
@@ -40,7 +37,7 @@ class Conversation:
             messages = self.messages.copy()
             init_role, init_msg = messages[0].copy()
             init_msg = init_msg[0].replace("<image>", "").strip()
-            if "mmtag" in self.version:
+            if 'mmtag' in self.version:
                 messages[0] = (init_role, init_msg)
                 messages.insert(0, (self.roles[0], "<Image><image></Image>"))
                 messages.insert(1, (self.roles[1], "Received."))
@@ -107,13 +104,8 @@ class Conversation:
                 else:
                     ret += role
         elif self.sep_style == SeparatorStyle.LLAMA_2:
-
-            def wrap_sys(msg):
-                return f"<<SYS>>\n{msg}\n<</SYS>>\n\n" if len(msg) > 0 else msg
-
-            def wrap_inst(msg):
-                return f"[INST] {msg} [/INST]"
-
+            def wrap_sys(msg): return f"<<SYS>>\n{msg}\n<</SYS>>\n\n" if len(msg) > 0 else msg
+            def wrap_inst(msg): return f"[INST] {msg} [/INST]"
             ret = ""
 
             for i, (role, message) in enumerate(messages):
@@ -151,17 +143,8 @@ class Conversation:
     def append_message(self, role, message):
         self.messages.append([role, message])
 
-    def process_image(
-        self,
-        image,
-        image_process_mode,
-        return_pil=False,
-        image_format="PNG",
-        max_len=1344,
-        min_len=672,
-    ):
+    def process_image(self, image, image_process_mode, return_pil=False, image_format='PNG', max_len=1344, min_len=672):
         if image_process_mode == "Pad":
-
             def expand2square(pil_img, background_color=(122, 116, 104)):
                 width, height = pil_img.size
                 if width == height:
@@ -174,7 +157,6 @@ class Conversation:
                     result = Image.new(pil_img.mode, (height, height), background_color)
                     result.paste(pil_img, ((height - width) // 2, 0))
                     return result
-
             image = expand2square(image)
         elif image_process_mode in ["Default", "Crop"]:
             pass
@@ -203,27 +185,25 @@ class Conversation:
 
     def get_images(self, return_pil=False):
         images = []
-        for i, (role, msg) in enumerate(self.messages[self.offset :]):
+        for i, (role, msg) in enumerate(self.messages[self.offset:]):
             if i % 2 == 0:
                 if type(msg) is tuple:
                     msg, image, image_process_mode = msg
-                    image = self.process_image(
-                        image, image_process_mode, return_pil=return_pil
-                    )
+                    image = self.process_image(image, image_process_mode, return_pil=return_pil)
                     images.append(image)
         return images
 
     def to_gradio_chatbot(self):
         ret = []
-        for i, (role, msg) in enumerate(self.messages[self.offset :]):
+        for i, (role, msg) in enumerate(self.messages[self.offset:]):
             if i % 2 == 0:
                 if type(msg) is tuple:
                     msg, image, image_process_mode = msg
                     img_b64_str = self.process_image(
-                        image, "Default", return_pil=False, image_format="JPEG"
-                    )
+                        image, "Default", return_pil=False,
+                        image_format='JPEG')
                     img_str = f'<img src="data:image/jpeg;base64,{img_b64_str}" alt="user upload image" />'
-                    msg = img_str + msg.replace("<image>", "").strip()
+                    msg = img_str + msg.replace('<image>', '').strip()
                     ret.append([msg, None])
                 else:
                     ret.append([msg, None])
@@ -240,17 +220,14 @@ class Conversation:
             sep_style=self.sep_style,
             sep=self.sep,
             sep2=self.sep2,
-            version=self.version,
-        )
+            version=self.version)
 
     def dict(self):
         if len(self.get_images()) > 0:
             return {
                 "system": self.system,
                 "roles": self.roles,
-                "messages": [
-                    [x, y[0] if type(y) is tuple else y] for x, y in self.messages
-                ],
+                "messages": [[x, y[0] if type(y) is tuple else y] for x, y in self.messages],
                 "offset": self.offset,
                 "sep": self.sep,
                 "sep2": self.sep2,
@@ -267,15 +244,11 @@ class Conversation:
 
 conv_vicuna_v0 = Conversation(
     system="A chat between a curious human and an artificial intelligence assistant. "
-    "The assistant gives helpful, detailed, and polite answers to the human's questions.",
+           "The assistant gives helpful, detailed, and polite answers to the human's questions.",
     roles=("Human", "Assistant"),
     messages=(
-        (
-            "Human",
-            "What are the key differences between renewable and non-renewable energy sources?",
-        ),
-        (
-            "Assistant",
+        ("Human", "What are the key differences between renewable and non-renewable energy sources?"),
+        ("Assistant",
             "Renewable energy sources are those that can be replenished naturally in a relatively "
             "short amount of time, such as solar, wind, hydro, geothermal, and biomass. "
             "Non-renewable energy sources, on the other hand, are finite and will eventually be "
@@ -293,8 +266,7 @@ conv_vicuna_v0 = Conversation(
             "5. Flexibility: Renewable energy sources are often more flexible and can be adapted to different "
             "situations and needs, while non-renewable sources are more rigid and inflexible.\n"
             "6. Sustainability: Renewable energy sources are more sustainable over the long term, while "
-            "non-renewable sources are not, and their depletion can lead to economic and social instability.\n",
-        ),
+            "non-renewable sources are not, and their depletion can lead to economic and social instability.\n")
     ),
     offset=2,
     sep_style=SeparatorStyle.SINGLE,
@@ -328,8 +300,8 @@ If a question does not make any sense, or is not factually coherent, explain why
 
 conv_llava_llama_2 = Conversation(
     system="You are a helpful language and vision assistant. "
-    "You are able to understand the visual content that the user provides, "
-    "and assist the user with a variety of tasks using natural language.",
+           "You are able to understand the visual content that the user provides, "
+           "and assist the user with a variety of tasks using natural language.",
     roles=("USER", "ASSISTANT"),
     version="llama_v2",
     messages=(),
@@ -353,7 +325,8 @@ A conversation between a user and an LLM-based AI assistant. The assistant gives
 conv_llava_plain = Conversation(
     system="",
     roles=("", ""),
-    messages=(),
+    messages=(
+    ),
     offset=0,
     sep_style=SeparatorStyle.PLAIN,
     sep="\n",
@@ -361,9 +334,10 @@ conv_llava_plain = Conversation(
 
 conv_llava_v0 = Conversation(
     system="A chat between a curious human and an artificial intelligence assistant. "
-    "The assistant gives helpful, detailed, and polite answers to the human's questions.",
+           "The assistant gives helpful, detailed, and polite answers to the human's questions.",
     roles=("Human", "Assistant"),
-    messages=(),
+    messages=(
+    ),
     offset=0,
     sep_style=SeparatorStyle.SINGLE,
     sep="###",
@@ -371,10 +345,11 @@ conv_llava_v0 = Conversation(
 
 conv_llava_v0_mmtag = Conversation(
     system="A chat between a curious user and an artificial intelligence assistant. "
-    "The assistant is able to understand the visual content that the user provides, and assist the user with a variety of tasks using natural language."
-    "The visual content will be provided with the following format: <Image>visual content</Image>.",
+           "The assistant is able to understand the visual content that the user provides, and assist the user with a variety of tasks using natural language."
+           "The visual content will be provided with the following format: <Image>visual content</Image>.",
     roles=("Human", "Assistant"),
-    messages=(),
+    messages=(
+    ),
     offset=0,
     sep_style=SeparatorStyle.SINGLE,
     sep="###",
@@ -383,7 +358,7 @@ conv_llava_v0_mmtag = Conversation(
 
 conv_llava_v1 = Conversation(
     system="A chat between a curious human and an artificial intelligence assistant. "
-    "The assistant gives helpful, detailed, and polite answers to the human's questions.",
+           "The assistant gives helpful, detailed, and polite answers to the human's questions.",
     roles=("USER", "ASSISTANT"),
     version="v1",
     messages=(),
@@ -395,8 +370,8 @@ conv_llava_v1 = Conversation(
 
 conv_llava_v1_mmtag = Conversation(
     system="A chat between a curious user and an artificial intelligence assistant. "
-    "The assistant is able to understand the visual content that the user provides, and assist the user with a variety of tasks using natural language."
-    "The visual content will be provided with the following format: <Image>visual content</Image>.",
+           "The assistant is able to understand the visual content that the user provides, and assist the user with a variety of tasks using natural language."
+           "The visual content will be provided with the following format: <Image>visual content</Image>.",
     roles=("USER", "ASSISTANT"),
     messages=(),
     offset=0,
@@ -488,6 +463,7 @@ conv_templates = {
     "mistral_instruct": conv_mistral_instruct,
     "chatml_direct": conv_chatml_direct,
     "mistral_direct": conv_chatml_direct,
+
     "plain": conv_llava_plain,
     "v0_plain": conv_llava_plain,
     "llava_v0": conv_llava_v0,
@@ -495,6 +471,7 @@ conv_templates = {
     "llava_v1": conv_llava_v1,
     "v1_mmtag": conv_llava_v1_mmtag,
     "llava_llama_2": conv_llava_llama_2,
+
     "mpt": conv_mpt,
 }
 

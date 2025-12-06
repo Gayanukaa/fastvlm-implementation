@@ -2,8 +2,8 @@
 # For licensing see accompanying LICENSE file.
 # Copyright (C) 2025 Apple Inc. All Rights Reserved.
 #
-import json
 import os
+import json
 from typing import Any
 
 import torch.nn as nn
@@ -13,7 +13,7 @@ from .mci import GlobalPool2D
 
 
 def load_model_config(
-    model_name: str,
+        model_name: str,
 ) -> Any:
     # Strip suffixes to model name
     model_name = "_".join(model_name.split("_")[0:2])

@@ -152,3 +152,8 @@ LICENSE.txt
 .swift-version
 experiments/old_results/
 encoder_models/
+checkpoints/
+images/
+finetune/__pycache__/
+dataset/
+models/
