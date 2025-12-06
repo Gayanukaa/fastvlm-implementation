@@ -97,32 +97,24 @@ def live_inference(image, prompt, temperature, top_p):
         # Process Image
         image_tensor = process_images([image], image_processor, model.config)[0]
 
-        # Generate
+        # Generate with stricter parameters for live video
         with torch.inference_mode():
-            # Only use sampling parameters if temperature > 0
-            if temperature > 0:
-                output_ids = model.generate(
-                    inputs=input_ids,
-                    images=image_tensor.unsqueeze(0).half(),
-                    image_sizes=[image.size],
-                    do_sample=True,
-                    temperature=temperature,
-                    top_p=top_p,
-                    max_new_tokens=64,
-                    use_cache=True
-                )
-            else:
-                output_ids = model.generate(
-                    inputs=input_ids,
-                    images=image_tensor.unsqueeze(0).half(),
-                    image_sizes=[image.size],
-                    do_sample=False,
-                    max_new_tokens=64,
-                    use_cache=True
-                )
+            output_ids = model.generate(
+                inputs=input_ids,
+                images=image_tensor.unsqueeze(0).half(),
+                image_sizes=[image.size],
+                do_sample=False,  # Greedy decoding for consistency
+                max_new_tokens=30,  # Reduced for faster, cleaner output
+                use_cache=True,
+                repetition_penalty=1.2,  # Penalize repetition
+                eos_token_id=tokenizer.eos_token_id,
+            )
 
         # Decode the generated tokens
         output_text = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0].strip()
+
+        # Clean up the output - extract only the first sentence/response
+        output_text = clean_live_output(output_text)
 
         # Debug: print to console
         print(f"Generated text: '{output_text}' (length: {len(output_text)})")
@@ -145,6 +137,30 @@ def live_inference(image, prompt, temperature, top_p):
         return error_msg, "❌ Error occurred"
     finally:
         is_generating_live = False
+
+
+def clean_live_output(text):
+    """Clean up model output for live video display."""
+    # Remove common repetitive patterns
+    if "Answer:" in text:
+        text = text.split("Answer:")[0].strip()
+    
+    # Remove code blocks
+    if "```" in text:
+        text = text.split("```")[0].strip()
+    
+    # Take only the first sentence if multiple exist
+    for delimiter in ['\n\n', '\n']:
+        if delimiter in text:
+            text = text.split(delimiter)[0].strip()
+            break
+    
+    # Limit length
+    if len(text) > 150:
+        text = text[:150].rsplit(' ', 1)[0] + "..."
+    
+    return text
+
 
 def chat(message, history, image, temperature, top_p):
     global tokenizer, model, image_processor
