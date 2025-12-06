@@ -1,5 +1,5 @@
 """
-make_table3_fastvlm.py
+exp_table3.py
 
 Replicates Table 3 from the FastVLM paper - Encoder comparison benchmark.
 
