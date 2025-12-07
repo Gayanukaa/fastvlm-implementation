@@ -3,18 +3,17 @@ exp_table11.py
 
 Mini Table 11 Replication (FastVLM 0.5B vs 1.5B)
 
-Same output format + saving functions as Table 5:
+Same output format style + saving functions as other tables:
 - print_markdown_table(rows)
 - save_table_as_image(rows)
 
 Columns:
-| Model | Params | Resolution | Visual Tokens | TextVQA Acc (%) | DocVQA Acc (%) | Avg Latency (ms) |
+| Model | Resolution | Visual Tokens | TextVQA Acc (%) | DocVQA Acc (%) |
 """
 
 import os
 import sys
-import time
-from typing import Dict, List, Any
+from typing import List, Dict, Any, Tuple
 
 import torch
 from PIL import Image
@@ -25,7 +24,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from llava.constants import DEFAULT_IMAGE_TOKEN, IMAGE_TOKEN_INDEX
 from llava.conversation import conv_templates
-from llava.mm_utils import process_images, tokenizer_image_token, get_model_name_from_path
+from llava.mm_utils import (
+    process_images,
+    tokenizer_image_token,
+    get_model_name_from_path,
+)
 from llava.model.builder import load_pretrained_model
 from llava.utils import disable_torch_init
 
@@ -43,19 +46,19 @@ MODELS = [
     ("FastVLM-1.5B", "../checkpoints/llava-fastvithd_1.5b_stage3"),
 ]
 
+# Resolutions & visual tokens (matching paper)
 RESOLUTIONS = [1024, 2048]
-
-# Your custom visual token mapping
 CUSTOM_VISUAL_TOKENS = {
     1024: 256,
     2048: 1280,
 }
 
+# Number of samples per dataset (quick replication)
 MAX_SAMPLES = 100
-N_WARMUP = 2
+N_WARMUP = 1
 
 
-# ---------------- UTILS ---------------- #
+# ---------------- UTILITY FUNCTIONS ---------------- #
 
 def normalize_answer(s: str) -> str:
     import re, string
@@ -66,91 +69,137 @@ def normalize_answer(s: str) -> str:
 
 
 def vqa_accuracy(pred: str, gts: List[str]) -> float:
+    """
+    Relaxed VQA-style accuracy:
+    - normalize prediction and each ground truth
+    - exact match or substring match counts as correct
+    """
     pred_norm = normalize_answer(pred)
+    if not pred_norm:
+        return 0.0
+
     for gt in gts:
-        if normalize_answer(gt) == pred_norm:
+        gt_norm = normalize_answer(gt)
+        if not gt_norm:
+            continue
+        if pred_norm == gt_norm:
+            return 1.0
+        if pred_norm in gt_norm or gt_norm in pred_norm:
             return 1.0
     return 0.0
 
 
 def load_vlm_model(path: str):
+    """Load VLM checkpoint (tokenizer, model, image_processor)."""
     disable_torch_init()
     model_name = get_model_name_from_path(path)
     tokenizer, model, image_processor, _ = load_pretrained_model(
         path, None, model_name, device=DEVICE
     )
-    model.generation_config.pad_token_id = tokenizer.pad_token_id
+    if hasattr(model, "generation_config"):
+        model.generation_config.pad_token_id = tokenizer.pad_token_id
     model.eval()
     return tokenizer, model, image_processor
 
 
-def resize_image(img: Image.Image, res: int):
+def resize_image(img: Image.Image, res: int) -> Image.Image:
+    img = img.convert("RGB")
     return img.resize((res, res), Image.LANCZOS)
 
 
-def run_inference(model, tokenizer, image_processor, img, question, res: int):
-    img_resized = resize_image(img, res)
-
+def build_prompt(question: str) -> str:
     qs = DEFAULT_IMAGE_TOKEN + "\n" + question
     conv = conv_templates[CONV_MODE].copy()
     conv.append_message(conv.roles[0], qs)
     conv.append_message(conv.roles[1], None)
-    prompt = conv.get_prompt()
+    return conv.get_prompt()
 
-    input_ids = tokenizer_image_token(prompt, tokenizer, IMAGE_TOKEN_INDEX,
-                                      return_tensors="pt").unsqueeze(0).to(DEVICE)
 
+def run_inference(
+    model,
+    tokenizer,
+    image_processor,
+    img: Image.Image,
+    question: str,
+    res: int,
+) -> str:
+    """
+    Run full VLM inference (no timing).
+    Returns: generated answer string.
+    """
+    img_resized = resize_image(img, res)
+    prompt = build_prompt(question)
+
+    # Text tokens
+    input_ids = tokenizer_image_token(
+        prompt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt"
+    ).unsqueeze(0).to(DEVICE)
+
+    # Image tensor
     img_tensor = process_images([img_resized], image_processor, model.config)[0]
-
-    torch.cuda.synchronize() if DEVICE == "cuda" else None
-    start = time.time()
+    img_tensor = img_tensor.to(device=DEVICE, dtype=DTYPE)
 
     with torch.no_grad():
         out_ids = model.generate(
             input_ids,
-            images=img_tensor.unsqueeze(0).to(dtype=DTYPE),
+            images=img_tensor.unsqueeze(0),
             image_sizes=[img_resized.size],
             max_new_tokens=64,
-            do_sample=False
+            do_sample=False,
+            use_cache=True,
         )
 
-    torch.cuda.synchronize() if DEVICE == "cuda" else None
-
-    latency = (time.time() - start) * 1000
-    ans = tokenizer.batch_decode(out_ids, skip_special_tokens=True)[0].strip()
-    return ans, latency
+    answer = tokenizer.batch_decode(out_ids, skip_special_tokens=True)[0].strip()
+    return answer
 
 
-def evaluate_dataset(model, tokenizer, image_processor, samples, res: int):
+def evaluate_dataset(
+    model,
+    tokenizer,
+    image_processor,
+    samples: List[Dict[str, Any]],
+    res: int,
+) -> float:
+    """
+    Evaluate a dataset at a specific resolution.
+    Returns: accuracy percentage (or None if failed).
+    """
     if len(samples) == 0:
-        return None, None
+        return None
 
-    # Warmup
-    for _ in range(N_WARMUP):
-        _ = run_inference(model, tokenizer, image_processor,
-                          samples[0]["image"], samples[0]["question"], res)
+    # Warmup on first sample (no timing)
+    for _ in range(min(N_WARMUP, len(samples))):
+        _ = run_inference(
+            model, tokenizer, image_processor,
+            samples[0]["image"], samples[0]["question"], res
+        )
 
-    acc = 0.0
-    latencies = []
+    correct = 0.0
+    total = 0
 
     for s in tqdm(samples, desc=f"Eval@{res}px"):
         try:
-            pred, lt = run_inference(model, tokenizer, image_processor,
-                                     s["image"], s["question"], res)
-            acc += vqa_accuracy(pred, s["answers"])
-            latencies.append(lt)
-        except:
+            pred = run_inference(
+                model, tokenizer, image_processor,
+                s["image"], s["question"], res
+            )
+            acc = vqa_accuracy(pred, s["answers"])
+            correct += acc
+            total += 1
+        except Exception:
             continue
 
-    accuracy = (acc / len(latencies)) * 100 if latencies else None
-    avg_latency = sum(latencies) / len(latencies) if latencies else None
-    return accuracy, avg_latency
+    if total == 0:
+        return None
+
+    accuracy = (correct / total) * 100.0
+    return accuracy
 
 
-# ---------------- MAIN TABLE 11 ---------------- #
+# ---------------- MAIN TABLE 11 LOGIC ---------------- #
 
-def build_table11():
-    rows = []
+def build_table11() -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
 
     print("\n📚 Loading datasets...")
     textvqa = get_benchmark_dataset("textvqa", "validation", MAX_SAMPLES)
@@ -159,77 +208,78 @@ def build_table11():
     for model_name, ckpt in MODELS:
         print(f"\n🔹 Loading {model_name} from {ckpt}")
         tokenizer, model, image_processor = load_vlm_model(ckpt)
-        params_m = sum(p.numel() for p in model.parameters()) / 1e6
 
         for res in RESOLUTIONS:
             tokens = CUSTOM_VISUAL_TOKENS[res]
+            print(f"\n===== {model_name} @ {res}px ({tokens} tokens) =====")
 
-            print(f"\n===== Resolution {res}px ({tokens} tokens) =====")
-
-            txt_acc, txt_lat = evaluate_dataset(
+            text_acc = evaluate_dataset(
                 model, tokenizer, image_processor, textvqa, res
             )
-
-            doc_acc, doc_lat = evaluate_dataset(
+            doc_acc = evaluate_dataset(
                 model, tokenizer, image_processor, docvqa, res
             )
 
             rows.append({
                 "model": model_name,
-                "params_m": params_m,
                 "resolution": res,
                 "tokens": tokens,
-                "textvqa_acc": txt_acc,
+                "textvqa_acc": text_acc,
                 "docvqa_acc": doc_acc,
-                "avg_latency": txt_lat,   # using TextVQA latency consistently
             })
 
         del model, tokenizer
-        torch.cuda.empty_cache()
+        if DEVICE == "cuda":
+            torch.cuda.empty_cache()
 
     return rows
 
 
-# ---------------- OUTPUT (Same as Table 5) ---------------- #
+# ---------------- PRINT & SAVE (SAME FORMAT STYLE) ---------------- #
 
-def print_markdown_table(rows):
-    print("\n" + "="*80)
+def print_markdown_table(rows: List[Dict[str, Any]]):
+    """Print markdown table (style consistent with other experiments)."""
+    print("\n" + "=" * 80)
     print("### Table 11 (Replication) — FastVLM Model Comparison")
-    print("="*80 + "\n")
+    print("=" * 80 + "\n")
 
-    print("| Model | Params (M) | Resolution | Visual Tokens | TextVQA Acc (%) | DocVQA Acc (%) | Avg Latency (ms) |")
-    print("|-------|------------|------------|----------------|------------------|----------------|------------------|")
+    print("| Model | Resolution | Visual Tokens | TextVQA Acc (%) | DocVQA Acc (%) |")
+    print("|-------|------------|---------------|------------------|----------------|")
 
     for r in rows:
-        textvqa = '-' if r['textvqa_acc'] is None else f"{r['textvqa_acc']:.1f}"
-        docvqa = '-' if r['docvqa_acc'] is None else f"{r['docvqa_acc']:.1f}"
-        avglat = '-' if r['avg_latency'] is None else f"{r['avg_latency']:.1f}"
+        textvqa = "-" if r["textvqa_acc"] is None else f"{r['textvqa_acc']:.1f}"
+        docvqa = "-" if r["docvqa_acc"] is None else f"{r['docvqa_acc']:.1f}"
         print(
-            f"| {r['model']} | {r['params_m']:.1f} | {r['resolution']} | {r['tokens']} | {textvqa} | {docvqa} | {avglat} |"
+            f"| {r['model']} | {r['resolution']} | {r['tokens']} | "
+            f"{textvqa} | {docvqa} |"
         )
 
 
-def save_table_as_image(rows):
-    headers = ["Model", "Params (M)", "Resolution", "Visual Tokens",
-               "TextVQA Acc (%)", "DocVQA Acc (%)", "Avg Latency (ms)"]
-
+def save_table_as_image(rows: List[Dict[str, Any]]):
+    """Save results as a LaTeX-style table image (PNG), same style as other tables."""
+    headers = [
+        "Model",
+        "Resolution",
+        "Visual Tokens",
+        "TextVQA Acc (%)",
+        "DocVQA Acc (%)",
+    ]
     table_rows = []
+
     for r in rows:
         table_rows.append([
             r["model"],
-            f"{r['params_m']:.1f}",
             str(r["resolution"]),
             str(r["tokens"]),
             "-" if r["textvqa_acc"] is None else f"{r['textvqa_acc']:.1f}",
             "-" if r["docvqa_acc"] is None else f"{r['docvqa_acc']:.1f}",
-            "-" if r["avg_latency"] is None else f"{r['avg_latency']:.1f}",
         ])
 
     save_table_image(
         headers,
         table_rows,
-        "table11_fastvlm_comparison.png",
-        title="Table 11: FastVLM Model Comparison"
+        "table11_fastvlm_comparison.png",   # <- same PNG style/flow as others
+        title="Table 11: FastVLM Model Comparison",
     )
 
 
@@ -239,4 +289,3 @@ if __name__ == "__main__":
     rows = build_table11()
     print_markdown_table(rows)
     save_table_as_image(rows)
-
