@@ -28,11 +28,12 @@ OUTPUT_DIR="models/exercise-video-finetuned"
 NUM_VIDEO_FRAMES=4  # Reduced for memory efficiency on 8GB GPU
 
 # Training hyperparameters (optimized for 8GB VRAM)
-BATCH_SIZE=1
-GRAD_ACCUM_STEPS=8
+BATCH_SIZE=8
+GRAD_ACCUM_STEPS=2
 LEARNING_RATE=2e-5
 NUM_EPOCHS=3
 MODEL_MAX_LENGTH=2048
+WARMUP_RATIO=0.03
 
 # WandB configuration
 export WANDB_PROJECT="fastvlm"
@@ -43,6 +44,7 @@ export WANDB_LOG_MODEL="end"  # Log model at end of training (options: false, en
 # Evaluation configuration
 EVAL_STRATEGY="steps"
 EVAL_STEPS=50
+SAVE_STEPS=50
 
 # Create output directory if it doesn't exist
 mkdir -p "$OUTPUT_DIR"
@@ -76,11 +78,12 @@ cat > "$HPARAMS_FILE" << EOF
   "tf32": true,
   "gradient_checkpointing": true,
   "weight_decay": 0.0,
-  "warmup_ratio": 0.05,
+  "warmup_ratio": $WARMUP_RATIO,
   "lr_scheduler_type": "cosine",
   "dataloader_num_workers": 2,
   "evaluation_strategy": "$EVAL_STRATEGY",
   "eval_steps": $EVAL_STEPS,
+  "save_steps": $SAVE_STEPS,
   "wandb_project": "$WANDB_PROJECT",
   "wandb_entity": "$WANDB_ENTITY",
   "wandb_run_name": "fastvlm-finetune-${TIMESTAMP}"
@@ -101,6 +104,7 @@ echo "Effective batch size: $((BATCH_SIZE * GRAD_ACCUM_STEPS))"
 echo "Learning rate: $LEARNING_RATE"
 echo "Epochs: $NUM_EPOCHS"
 echo "Evaluation: $EVAL_STRATEGY every $EVAL_STEPS steps"
+echo "Saving: Every $SAVE_STEPS steps"
 echo "WandB: $WANDB_ENTITY/$WANDB_PROJECT ($WANDB_NAME)"
 echo "Log file: $LOG_FILE"
 echo "Hyperparameters: $HPARAMS_FILE"
@@ -133,11 +137,11 @@ python -u llava/train/train_mem.py \
     --evaluation_strategy "$EVAL_STRATEGY" \
     --eval_steps $EVAL_STEPS \
     --save_strategy "steps" \
-    --save_steps 100 \
+    --save_steps $SAVE_STEPS \
     --save_total_limit 2 \
     --learning_rate $LEARNING_RATE \
     --weight_decay 0.0 \
-    --warmup_ratio 0.03 \
+    --warmup_ratio $WARMUP_RATIO \
     --lr_scheduler_type "cosine" \
     --logging_steps 1 \
     --tf32 True \
