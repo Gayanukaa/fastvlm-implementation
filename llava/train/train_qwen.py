@@ -645,14 +645,15 @@ def preprocess_qwen_2(
                 # Small mismatches are common due to separator token handling
                 # and don't affect training quality - don't discard the sample
                 diff = abs(cur_len - total_len)
-                if diff > 5:
+                # For video with multiple frames, allow larger tolerance (up to 20 tokens)
+                if diff > 20:
                     # Only discard and warn for large mismatches which indicate real problems
                     target[:] = IGNORE_INDEX
                     print(
                         f"WARNING: large tokenization mismatch: {cur_len} vs. {total_len} (diff={diff}). "
                         f"(sample ignored)"
                     )
-                # Small mismatches (<=5 tokens) are silently accepted - training continues normally
+                # Mismatches <=20 tokens are silently accepted - training continues normally
 
     return dict(
         input_ids=input_ids,

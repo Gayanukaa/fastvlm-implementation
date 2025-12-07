@@ -170,10 +170,10 @@ fi
 
 # Check required scripts and utilities
 echo -e "\n[5] Checking required scripts..."
-if [ -f "scripts/train_video_exercise.sh" ]; then
-    echo "✓ scripts/train_video_exercise.sh found"
+if [ -f "scripts/finetune_video.sh" ]; then
+    echo "✓ scripts/finetune_video.sh found"
 else
-    echo "✗ scripts/train_video_exercise.sh NOT found"
+    echo "✗ scripts/finetune_video.sh NOT found"
 fi
 
 if [ -f "llava/train/train_mem.py" ]; then

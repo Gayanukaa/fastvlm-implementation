@@ -134,6 +134,7 @@ python -u llava/train/train_mem.py \
     --num_video_frames $NUM_VIDEO_FRAMES \
     --bf16 True \
     --output_dir "$OUTPUT_DIR" \
+    --run_name "fastvlm-finetune-${TIMESTAMP}" \
     --num_train_epochs $NUM_EPOCHS \
     --per_device_train_batch_size $BATCH_SIZE \
     --per_device_eval_batch_size $BATCH_SIZE \
