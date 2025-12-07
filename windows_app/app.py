@@ -7,7 +7,6 @@ import gradio as gr
 from PIL import Image
 from collections import deque
 
-# Add parent directory to path to import llava
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from llava.model.builder import load_pretrained_model
@@ -15,7 +14,6 @@ from llava.mm_utils import tokenizer_image_token, process_images, get_model_name
 from llava.constants import IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN
 from transformers import TextIteratorStreamer
 
-# Global variables to hold model components
 tokenizer = None
 model = None
 image_processor = None
@@ -24,11 +22,9 @@ current_model_name = None
 is_generating_live = False
 last_live_output = ""
 
-# Performance tracking
 performance_history = deque(maxlen=30)
 frame_skip_counter = 0
 
-# Cached tensors for efficiency
 cached_prompt_ids = None
 cached_prompt_text = None
 
@@ -37,10 +33,9 @@ MODELS = {
     "Stage 3 (0.5B)": "../checkpoints/llava-fastvithd_0.5b_stage3"
 }
 
-# Preset prompts
 PRESET_PROMPTS = {
     "Describe": "Describe what you see briefly.",
-    "Count Objects": "Count the main objects visible.",
+    "Count Objects": "Count how many fingers i am holding up?",
     "Read Text": "Read any text visible in the image.",
     "Identify": "What is the main subject?",
     "Action": "What action is happening?",
@@ -49,7 +44,6 @@ PRESET_PROMPTS = {
 
 
 def get_device():
-    """Get the best available device."""
     if torch.cuda.is_available():
         return "cuda"
     elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
@@ -67,7 +61,6 @@ def load_model_fn(model_choice):
 
     print(f"Loading {model_choice} from {model_path}...")
     try:
-        # Unload previous model if exists to save VRAM
         if model is not None:
             del model
             if torch.cuda.is_available():
@@ -341,8 +334,7 @@ def chat(message, history, image, temperature, top_p):
 
 # UI Construction
 with gr.Blocks(title="FastVLM Inference", theme=gr.themes.Default(primary_hue="orange", secondary_hue="yellow")) as demo:
-    gr.Markdown("# 🍎 FastVLM Inference Engine")
-    gr.Markdown("*Efficient Vision-Language Model for real-time inference*")
+    gr.Markdown("# FastVLM Inference Engine")
 
     with gr.Row():
         with gr.Column(scale=1):
