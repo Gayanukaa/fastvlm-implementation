@@ -28,7 +28,7 @@ OUTPUT_DIR="models/exercise-video-finetuned"
 NUM_VIDEO_FRAMES=4  # Reduced for memory efficiency
 
 # Training hyperparameters (optimized for memory efficiency)
-BATCH_SIZE=2
+BATCH_SIZE=1
 GRAD_ACCUM_STEPS=8
 LEARNING_RATE=2e-5
 NUM_EPOCHS=3
