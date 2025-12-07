@@ -1,6 +1,6 @@
 #!/bin/bash
 # FastVLM Experiments Runner
-# Runs all replication experiments for Tables 3, 4, 5 and Figure 5
+# Runs all replication experiments for Tables 3, 4, 5 and 11
 
 set -e  # Exit on error
 
@@ -106,21 +106,21 @@ fi
 log ""
 
 # ============================================================
-# Experiment 4: Figure 5 - Vision vs LLM Prefilling Latency
+# Experiment 4: Table 11 - FastVLM 0.5B vs 1.5B
 # ============================================================
 log "============================================================"
-log "[4/4] Running Figure 5: Vision Latency vs LLM Prefilling"
-log "      (Resolution scaling: 256, 512, 768, 1024, 1536px)"
+log "[4/4] Running Table 11: FastVLM 0.5B vs 1.5B"
+log "      (Model comparison at 1024px and 2048px)"
 log "============================================================"
-python exp_figure5.py \
+python exp_table11.py \
     --model-path "$MODEL_PATH" \
     --device "$DEVICE" \
     $SAMPLES_ARG 2>&1 | tee -a "$LOG_FILE"
 
 if [ ${PIPESTATUS[0]} -eq 0 ]; then
-    log "Figure 5 completed successfully"
+    log "Table 11 completed successfully"
 else
-    log "Figure 5 failed"
+    log "Table 11 failed"
 fi
 log ""
 

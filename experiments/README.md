@@ -9,7 +9,7 @@ This folder contains scripts to replicate key results from the FastVLM paper (CV
 | `exp_table3.py`  | Table 3         | Encoder comparison benchmark (ViT-L/14, ConvNeXt-L, FastViT-HD) | None (latency only) |
 | `exp_table4.py`  | Table 4         | Visual token efficiency across encoders and resolutions         | TextVQA, DocVQA     |
 | `exp_table5.py`  | Table 5         | FastViT-HD visual token scaling (256-1024px)                    | TextVQA             |
-| `exp_figure5.py` | Figure 5        | Vision encoder vs LLM prefilling latency breakdown              | TextVQA             |
+| `exp_table11.py` | Table 11        | FastVLM 0.5B vs 1.5B comparison                                 | TextVQA, DocVQA     |
 
 ## Quick Start
 
@@ -38,7 +38,7 @@ pip install open_clip_torch
 
 **Arguments:**
 
-```
+```bash
 ./run_all_experiments.sh [MODEL_PATH] [DEVICE] [NUM_SAMPLES]
 ```
 
@@ -85,14 +85,15 @@ python exp_table4.py --model-path ../checkpoints/llava-fastvithd_0.5b_stage3 --d
 - `results/table4_visual_token_efficiency.png`
 
 **Configurations tested:**
-| Encoder | Resolution | Visual Tokens |
-|---------|------------|---------------|
-| FastViT-HD | 256px | 16 |
-| ConvNeXt-L | 320px | 100 |
-| FastViT-HD | 512px | 64 |
-| FastViT-HD | 768px | 144 |
-| ConvNeXt-L | 512px | 256 |
-| FastViT-HD | 1024px | 256 |
+
+| Encoder    | Resolution | Visual Tokens |
+| ---------- | ---------- | ------------- |
+| FastViT-HD | 256px      | 16            |
+| ConvNeXt-L | 320px      | 100           |
+| FastViT-HD | 512px      | 64            |
+| FastViT-HD | 768px      | 144           |
+| ConvNeXt-L | 512px      | 256           |
+| FastViT-HD | 1024px     | 256           |
 
 ---
 
@@ -118,29 +119,24 @@ python exp_table5.py --model-path ../checkpoints/llava-fastvithd_0.5b_stage3 --d
 
 ---
 
-### Figure 5: Vision vs LLM Prefilling Latency
+### Table 11: FastVLM 0.5B vs 1.5B
 
-Measures vision encoder latency and LLM prefilling latency separately (excludes token generation).
+Compares FastVLM 0.5B and 1.5B models across different resolutions.
 
 ```bash
 # Full dataset
-python exp_figure5.py --model-path ../checkpoints/llava-fastvithd_0.5b_stage3 --device cuda
+python exp_table11.py --model-path ../checkpoints/llava-fastvithd_0.5b_stage3 --device cuda
 
 # Quick test
-python exp_figure5.py --model-path ../checkpoints/llava-fastvithd_0.5b_stage3 --device cuda --num-samples 10
+python exp_table11.py --model-path ../checkpoints/llava-fastvithd_0.5b_stage3 --device cuda --num-samples 10
 ```
 
 **Output:**
 
-- `results/resolution_scaling_textvqa.csv`
-- `results/plots/figure5_resolution_scaling.png`
+- `results/table11_model_comparison.png`
 
-**Resolutions tested:** 256, 512, 768, 1024, 1536px
-
-**Metrics:**
-
-- Vision Latency (ms): Time for vision encoder forward pass
-- LLM Prefill Latency (ms): Time for LLM to process visual tokens
+**Models tested:** FastVLM-0.5B, FastVLM-1.5B
+**Resolutions tested:** 1024, 2048px
 
 ---
 
@@ -159,9 +155,7 @@ results/
     table3_encoder_comparison.png
     table4_visual_token_efficiency.png
     table5_fastvithd_efficiency.png
-    resolution_scaling_textvqa.csv
-    plots/
-        figure5_resolution_scaling.png
+    table11_model_comparison.png
 ```
 
 ## Hardware Notes
