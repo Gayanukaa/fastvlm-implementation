@@ -74,7 +74,9 @@ def resize_image(image, target_size):
     return new_image
 
 
-def measure_vision_and_prefill_latency(model, tokenizer, image_processor, image, prompt, device):
+def measure_vision_and_prefill_latency(
+    model, tokenizer, image_processor, image, prompt, device
+):
     """
     Measure Vision Encoder latency and LLM Prefilling latency separately.
     Does NOT include token generation/decoding time (unlike model.generate()).
@@ -167,14 +169,14 @@ def run_experiment(args):
 
     # Print original image processor settings
     print(f"   Original image_processor settings:")
-    if hasattr(image_processor, 'crop_size'):
+    if hasattr(image_processor, "crop_size"):
         print(f"      crop_size: {image_processor.crop_size}")
-    if hasattr(image_processor, 'size'):
+    if hasattr(image_processor, "size"):
         print(f"      size: {image_processor.size}")
 
     print("🔥 Warming up GPU...")
     # Create a dummy image and prompt
-    dummy_image = Image.new('RGB', (512, 512), color='white')
+    dummy_image = Image.new("RGB", (512, 512), color="white")
     dummy_prompt = "Warmup run"
 
     # Run inference once to initialize CUDA context and buffers
@@ -212,18 +214,18 @@ def run_experiment(args):
 
         # FORCE the image processor to respect the current resolution
         # By default, it may resize all images to a fixed size (e.g., 336px)
-        if hasattr(image_processor, 'crop_size'):
-            image_processor.crop_size['height'] = res
-            image_processor.crop_size['width'] = res
-        if hasattr(image_processor, 'size'):
+        if hasattr(image_processor, "crop_size"):
+            image_processor.crop_size["height"] = res
+            image_processor.crop_size["width"] = res
+        if hasattr(image_processor, "size"):
             # Handle different processor configurations
             if isinstance(image_processor.size, dict):
-                if 'shortest_edge' in image_processor.size:
-                    image_processor.size['shortest_edge'] = res
-                if 'height' in image_processor.size:
-                    image_processor.size['height'] = res
-                if 'width' in image_processor.size:
-                    image_processor.size['width'] = res
+                if "shortest_edge" in image_processor.size:
+                    image_processor.size["shortest_edge"] = res
+                if "height" in image_processor.size:
+                    image_processor.size["height"] = res
+                if "width" in image_processor.size:
+                    image_processor.size["width"] = res
             else:
                 image_processor.size = res
 
@@ -240,7 +242,9 @@ def run_experiment(args):
 
             # Debug: Show tensor shape for first sample at each resolution
             if first_sample:
-                debug_tensor = process_images([processed_image], image_processor, model.config)
+                debug_tensor = process_images(
+                    [processed_image], image_processor, model.config
+                )
                 print(f"   Tensor shape @ {res}px: {debug_tensor.shape}")
                 first_sample = False
 
@@ -262,20 +266,30 @@ def run_experiment(args):
         if vision_latencies:
             avg_vision = np.mean(vision_latencies)
             avg_prefill = np.mean(prefill_latencies)
-            results.append({
-                "resolution": res,
-                "vision_latency": avg_vision,
-                "llm_prefill_latency": avg_prefill,
-                "total_latency": avg_vision + avg_prefill,
-            })
-            print(f"   Vision: {avg_vision:.2f}ms | Prefill: {avg_prefill:.2f}ms | Total: {avg_vision + avg_prefill:.2f}ms")
+            results.append(
+                {
+                    "resolution": res,
+                    "vision_latency": avg_vision,
+                    "llm_prefill_latency": avg_prefill,
+                    "total_latency": avg_vision + avg_prefill,
+                }
+            )
+            print(
+                f"   Vision: {avg_vision:.2f}ms | Prefill: {avg_prefill:.2f}ms | Total: {avg_vision + avg_prefill:.2f}ms"
+            )
 
     # Save results
     os.makedirs("results", exist_ok=True)
     csv_path = "results/resolution_scaling_textvqa.csv"
     with open(csv_path, "w", newline="") as f:
         writer = csv.DictWriter(
-            f, fieldnames=["resolution", "vision_latency", "llm_prefill_latency", "total_latency"]
+            f,
+            fieldnames=[
+                "resolution",
+                "vision_latency",
+                "llm_prefill_latency",
+                "total_latency",
+            ],
         )
         writer.writeheader()
         writer.writerows(results)
@@ -286,10 +300,14 @@ def run_experiment(args):
     print("\n" + "=" * 70)
     print("  Figure 5 Replication — Vision Latency vs LLM Prefilling")
     print("=" * 70)
-    print(f"{'Resolution':<12} {'Vision (ms)':<15} {'Prefill (ms)':<15} {'Total (ms)':<12}")
+    print(
+        f"{'Resolution':<12} {'Vision (ms)':<15} {'Prefill (ms)':<15} {'Total (ms)':<12}"
+    )
     print("-" * 70)
     for r in results:
-        print(f"{r['resolution']:<12} {r['vision_latency']:<15.2f} {r['llm_prefill_latency']:<15.2f} {r['total_latency']:<12.2f}")
+        print(
+            f"{r['resolution']:<12} {r['vision_latency']:<15.2f} {r['llm_prefill_latency']:<15.2f} {r['total_latency']:<12.2f}"
+        )
     print("=" * 70)
 
     # Create grouped bar chart (Figure 5 style)
@@ -327,7 +345,7 @@ if __name__ == "__main__":
         "--num-samples",
         type=int,
         default=None,
-        help="Samples per resolution (default: full dataset)"
+        help="Samples per resolution (default: full dataset)",
     )
     args = parser.parse_args()
     run_experiment(args)

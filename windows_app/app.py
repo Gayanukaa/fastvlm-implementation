@@ -1,19 +1,30 @@
-import sys
 import os
-import time
+import sys
 import threading
-import torch
-import gradio as gr
-from PIL import Image
+import time
 from collections import deque
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+import gradio as gr
+import torch
+from PIL import Image
 
-from llava.model.builder import load_pretrained_model
-from llava.mm_utils import tokenizer_image_token, process_images, get_model_name_from_path
-from llava.constants import IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN
-from llava.conversation import conv_templates
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from transformers import TextIteratorStreamer
+
+from llava.constants import (
+    DEFAULT_IM_END_TOKEN,
+    DEFAULT_IM_START_TOKEN,
+    DEFAULT_IMAGE_TOKEN,
+    IMAGE_TOKEN_INDEX,
+)
+from llava.conversation import conv_templates
+from llava.mm_utils import (
+    get_model_name_from_path,
+    process_images,
+    tokenizer_image_token,
+)
+from llava.model.builder import load_pretrained_model
 
 # Global state
 tokenizer = None
@@ -29,7 +40,7 @@ cached_prompt_text = None
 
 MODELS = {
     "Stage 2 (0.5B)": "../checkpoints/llava-fastvithd_0.5b_stage2",
-    "Stage 3 (0.5B)": "../checkpoints/llava-fastvithd_0.5b_stage3"
+    "Stage 3 (0.5B)": "../checkpoints/llava-fastvithd_0.5b_stage3",
 }
 
 PRESET_PROMPTS = {
@@ -38,14 +49,14 @@ PRESET_PROMPTS = {
     "Read Text": "Read any text visible in the image.",
     "Identify": "What is the main subject?",
     "Action": "What action is happening?",
-    "Custom": ""
+    "Custom": "",
 }
 
 
 def get_device():
     if torch.cuda.is_available():
         return "cuda"
-    elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+    elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
         return "mps"
     return "cpu"
 
@@ -54,7 +65,9 @@ def load_model_fn(model_choice):
     global tokenizer, model, image_processor, current_model_name
     global cached_prompt_ids, cached_prompt_text
 
-    model_path = os.path.abspath(os.path.join(os.path.dirname(__file__), MODELS[model_choice]))
+    model_path = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), MODELS[model_choice])
+    )
 
     if current_model_name == model_choice:
         return f"✅ {model_choice} already loaded"
@@ -73,7 +86,7 @@ def load_model_fn(model_choice):
             model_path=model_path,
             model_base=None,
             model_name=get_model_name_from_path(model_path),
-            device=device
+            device=device,
         )
 
         model.eval()
@@ -105,9 +118,13 @@ def prepare_prompt(prompt):
     conv.append_message(conv.roles[0], qs)
     conv.append_message(conv.roles[1], None)
 
-    input_ids = tokenizer_image_token(
-        conv.get_prompt(), tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt'
-    ).unsqueeze(0).to(model.device)
+    input_ids = (
+        tokenizer_image_token(
+            conv.get_prompt(), tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt"
+        )
+        .unsqueeze(0)
+        .to(model.device)
+    )
 
     cached_prompt_text = prompt
     cached_prompt_ids = input_ids
@@ -124,20 +141,20 @@ def clean_output(text):
 
     text = text.replace("**", "").replace("*", "")
 
-    for delimiter in ['\n\n', '\n', '. ']:
+    for delimiter in ["\n\n", "\n", ". "]:
         if delimiter in text:
             text = text.split(delimiter)[0].strip()
-            if delimiter == '. ' and text:
-                text += '.'
+            if delimiter == ". " and text:
+                text += "."
             break
 
-    if text and text[-1] not in '.!?' and len(text) > 20:
-        last_space = text.rfind(' ')
+    if text and text[-1] not in ".!?" and len(text) > 20:
+        last_space = text.rfind(" ")
         if last_space > len(text) * 0.7:
             text = text[:last_space] + "..."
 
     if len(text) > 120:
-        text = text[:120].rsplit(' ', 1)[0] + "..."
+        text = text[:120].rsplit(" ", 1)[0] + "..."
 
     return text
 
@@ -160,7 +177,11 @@ def live_inference(image, prompt, frame_skip):
 
     frame_skip_counter += 1
     if frame_skip_counter < frame_skip:
-        return last_live_output, f"⏭️ Skip {frame_skip_counter}/{frame_skip}", get_stats()
+        return (
+            last_live_output,
+            f"⏭️ Skip {frame_skip_counter}/{frame_skip}",
+            get_stats(),
+        )
     frame_skip_counter = 0
 
     if is_generating_live:
@@ -221,12 +242,18 @@ def chat(message, history, image, temperature, top_p):
     conv.append_message(conv.roles[0], qs)
     conv.append_message(conv.roles[1], None)
 
-    input_ids = tokenizer_image_token(
-        conv.get_prompt(), tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt'
-    ).unsqueeze(0).to(model.device)
+    input_ids = (
+        tokenizer_image_token(
+            conv.get_prompt(), tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt"
+        )
+        .unsqueeze(0)
+        .to(model.device)
+    )
 
     image_tensor = process_images([image], image_processor, model.config)[0]
-    streamer = TextIteratorStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
+    streamer = TextIteratorStreamer(
+        tokenizer, skip_prompt=True, skip_special_tokens=True
+    )
 
     gen_kwargs = dict(
         inputs=input_ids,
@@ -272,9 +299,13 @@ with gr.Blocks(title="FastVLM", theme=gr.themes.Default(primary_hue="orange")) a
 
     with gr.Row():
         with gr.Column(scale=1):
-            model_dropdown = gr.Dropdown(list(MODELS.keys()), label="Model", value="Stage 3 (0.5B)")
+            model_dropdown = gr.Dropdown(
+                list(MODELS.keys()), label="Model", value="Stage 3 (0.5B)"
+            )
             load_btn = gr.Button("Load Model", variant="primary")
-            load_status = gr.Textbox(label="Status", value="No model", interactive=False)
+            load_status = gr.Textbox(
+                label="Status", value="No model", interactive=False
+            )
 
             temperature = gr.Slider(0, 1, value=0, step=0.1, label="Temperature")
             top_p = gr.Slider(0, 1, value=0.9, step=0.1, label="Top P")
@@ -284,7 +315,9 @@ with gr.Blocks(title="FastVLM", theme=gr.themes.Default(primary_hue="orange")) a
                 with gr.Tab("💬 Chat"):
                     image_input = gr.Image(type="pil", label="Image")
                     chatbot = gr.Chatbot(height=250, type="tuples")
-                    msg = gr.Textbox(label="Message", placeholder="Ask about the image...")
+                    msg = gr.Textbox(
+                        label="Message", placeholder="Ask about the image..."
+                    )
                     with gr.Row():
                         clear = gr.Button("Clear")
                         send = gr.Button("Send", variant="primary")
@@ -292,17 +325,36 @@ with gr.Blocks(title="FastVLM", theme=gr.themes.Default(primary_hue="orange")) a
 
                 with gr.Tab("📹 Live"):
                     with gr.Row():
-                        webcam = gr.Image(sources=["webcam"], streaming=True, type="pil", label="Camera")
+                        webcam = gr.Image(
+                            sources=["webcam"],
+                            streaming=True,
+                            type="pil",
+                            label="Camera",
+                        )
                         with gr.Column():
-                            preset = gr.Dropdown(list(PRESET_PROMPTS.keys()), label="Preset", value="Describe")
-                            live_prompt = gr.Textbox(label="Prompt", value="Describe what you see briefly.", lines=2)
-                            frame_skip = gr.Slider(1, 10, value=3, step=1, label="Frame Skip")
+                            preset = gr.Dropdown(
+                                list(PRESET_PROMPTS.keys()),
+                                label="Preset",
+                                value="Describe",
+                            )
+                            live_prompt = gr.Textbox(
+                                label="Prompt",
+                                value="Describe what you see briefly.",
+                                lines=2,
+                            )
+                            frame_skip = gr.Slider(
+                                1, 10, value=3, step=1, label="Frame Skip"
+                            )
 
                     output = gr.Textbox(label="Output", lines=2)
                     with gr.Row():
-                        status = gr.Textbox(label="Status", value="⏸️ Waiting...", interactive=False)
+                        status = gr.Textbox(
+                            label="Status", value="⏸️ Waiting...", interactive=False
+                        )
                         reset_btn = gr.Button("Reset Stats")
-                    stats = gr.Textbox(label="Stats", value="No data yet", interactive=False)
+                    stats = gr.Textbox(
+                        label="Stats", value="No data yet", interactive=False
+                    )
 
     # Events
     load_btn.click(load_model_fn, [model_dropdown], [load_status])
@@ -313,7 +365,7 @@ with gr.Blocks(title="FastVLM", theme=gr.themes.Default(primary_hue="orange")) a
         live_inference,
         [webcam, live_prompt, frame_skip],
         [output, status, stats],
-        show_progress="hidden"
+        show_progress="hidden",
     )
 
     def user_msg(msg, history):

@@ -24,14 +24,12 @@ Note: Paper implememtation details may vary; this is a close approximation. Beca
 """
 
 import time
-from typing import Dict, Any, List, Tuple
+from typing import Any, Dict, List, Tuple
 
+import matplotlib.pyplot as plt
 import torch
 from PIL import Image
-import matplotlib.pyplot as plt
-
 from utils_encoder_models import load_encoder  # you already have this
-
 
 # ---------------- CONFIG ---------------- #
 
@@ -57,6 +55,7 @@ torch.backends.cudnn.allow_tf32 = True
 
 
 # ---------------- UTILITIES ---------------- #
+
 
 def make_dummy_image(res: int) -> Image.Image:
     """Create a synthetic image for benchmarking."""
@@ -118,11 +117,12 @@ def measure_latency(
             for _ in range(n_runs):
                 t0 = time.time()
                 _ = encode_image_generic(model, inp)
-                total += (time.time() - t0)
+                total += time.time() - t0
         return (total / n_runs) * 1000.0  # ms
 
 
 # ---------------- MAIN BENCHMARK ---------------- #
+
 
 def run_benchmark() -> Dict[str, Dict[int, float]]:
     """
@@ -163,8 +163,10 @@ def run_benchmark() -> Dict[str, Dict[int, float]]:
 
             except TypeError:
                 # If your load_encoder only takes (name), fall back:
-                print("     ⚠ load_encoder(name, resolution=res) failed; "
-                      "trying load_encoder(name) without resolution.")
+                print(
+                    "     ⚠ load_encoder(name, resolution=res) failed; "
+                    "trying load_encoder(name) without resolution."
+                )
                 model, preprocess = load_encoder(enc_name)
                 model.to(DEVICE).to(dtype=DTYPE)
 
@@ -194,7 +196,13 @@ def print_latency_table(results: Dict[str, Dict[int, float]]):
     print("=" * 70 + "\n")
 
     header = "| Encoder | " + " | ".join(f"{r}px" for r in RESOLUTIONS) + " |"
-    sep = "|" + "-" * (len(" Encoder ") ) + "|" + "|".join("-" * (len(f" {r}px ") ) for r in RESOLUTIONS) + "|"
+    sep = (
+        "|"
+        + "-" * (len(" Encoder "))
+        + "|"
+        + "|".join("-" * (len(f" {r}px ")) for r in RESOLUTIONS)
+        + "|"
+    )
 
     print(header)
     print("|---------|" + "|".join("--------" for _ in RESOLUTIONS) + "|")
@@ -227,7 +235,9 @@ def plot_figure3_style(results: Dict[str, Dict[int, float]]):
 
     plt.xlabel("Input Resolution (px)")
     plt.ylabel("Encoder Latency (ms per image)")
-    plt.title("Figure 3 (Replication-style): Encoder Latency vs Resolution\n(ConvNeXt-L vs FastViT-HD, Encoder-only)")
+    plt.title(
+        "Figure 3 (Replication-style): Encoder Latency vs Resolution\n(ConvNeXt-L vs FastViT-HD, Encoder-only)"
+    )
     plt.grid(True, linestyle="--", alpha=0.4)
     plt.legend()
     plt.tight_layout()
@@ -241,7 +251,8 @@ if __name__ == "__main__":
     plot_figure3_style(results)
 
 
-print("""
+print(
+    """
 Why the latency plot does NOT match the FastVLM paper trend:
 
 1. Different FastViT-HD Implementation:
@@ -274,9 +285,10 @@ Why the latency plot does NOT match the FastVLM paper trend:
    - Apple’s FastViT-HD implementation removes many of these.
 
 Summary:
-The plotted values vary and the relative trend differs because 
-your models, hardware, and execution backend are 
-NOT the same as those used in the FastVLM paper, making an exact 
+The plotted values vary and the relative trend differs because
+your models, hardware, and execution backend are
+NOT the same as those used in the FastVLM paper, making an exact
 trend replication impossible.
 
-""")
+"""
+)

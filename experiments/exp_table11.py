@@ -14,7 +14,7 @@ Columns:
 import os
 import sys
 import time
-from typing import Dict, List, Any
+from typing import Any, Dict, List
 
 import torch
 from PIL import Image
@@ -23,14 +23,18 @@ from tqdm import tqdm
 # Add parent directory for llava imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from llava.constants import DEFAULT_IMAGE_TOKEN, IMAGE_TOKEN_INDEX
-from llava.conversation import conv_templates
-from llava.mm_utils import process_images, tokenizer_image_token, get_model_name_from_path
-from llava.model.builder import load_pretrained_model
-from llava.utils import disable_torch_init
-
 from utils_dataset import get_benchmark_dataset
 from utils_plot import save_table_image
+
+from llava.constants import DEFAULT_IMAGE_TOKEN, IMAGE_TOKEN_INDEX
+from llava.conversation import conv_templates
+from llava.mm_utils import (
+    get_model_name_from_path,
+    process_images,
+    tokenizer_image_token,
+)
+from llava.model.builder import load_pretrained_model
+from llava.utils import disable_torch_init
 
 # ---------------- CONFIG ---------------- #
 
@@ -57,8 +61,11 @@ N_WARMUP = 2
 
 # ---------------- UTILS ---------------- #
 
+
 def normalize_answer(s: str) -> str:
-    import re, string
+    import re
+    import string
+
     s = s.lower().strip()
     s = s.translate(str.maketrans("", "", string.punctuation))
     s = re.sub(r"\b(a|an|the)\b", " ", s)
@@ -97,8 +104,11 @@ def run_inference(model, tokenizer, image_processor, img, question, res: int):
     conv.append_message(conv.roles[1], None)
     prompt = conv.get_prompt()
 
-    input_ids = tokenizer_image_token(prompt, tokenizer, IMAGE_TOKEN_INDEX,
-                                      return_tensors="pt").unsqueeze(0).to(DEVICE)
+    input_ids = (
+        tokenizer_image_token(prompt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt")
+        .unsqueeze(0)
+        .to(DEVICE)
+    )
 
     img_tensor = process_images([img_resized], image_processor, model.config)[0]
 
@@ -111,7 +121,7 @@ def run_inference(model, tokenizer, image_processor, img, question, res: int):
             images=img_tensor.unsqueeze(0).to(dtype=DTYPE),
             image_sizes=[img_resized.size],
             max_new_tokens=64,
-            do_sample=False
+            do_sample=False,
         )
 
     torch.cuda.synchronize() if DEVICE == "cuda" else None
@@ -127,16 +137,23 @@ def evaluate_dataset(model, tokenizer, image_processor, samples, res: int):
 
     # Warmup
     for _ in range(N_WARMUP):
-        _ = run_inference(model, tokenizer, image_processor,
-                          samples[0]["image"], samples[0]["question"], res)
+        _ = run_inference(
+            model,
+            tokenizer,
+            image_processor,
+            samples[0]["image"],
+            samples[0]["question"],
+            res,
+        )
 
     acc = 0.0
     latencies = []
 
     for s in tqdm(samples, desc=f"Eval@{res}px"):
         try:
-            pred, lt = run_inference(model, tokenizer, image_processor,
-                                     s["image"], s["question"], res)
+            pred, lt = run_inference(
+                model, tokenizer, image_processor, s["image"], s["question"], res
+            )
             acc += vqa_accuracy(pred, s["answers"])
             latencies.append(lt)
         except:
@@ -148,6 +165,7 @@ def evaluate_dataset(model, tokenizer, image_processor, samples, res: int):
 
 
 # ---------------- MAIN TABLE 11 ---------------- #
+
 
 def build_table11():
     rows = []
@@ -174,15 +192,17 @@ def build_table11():
                 model, tokenizer, image_processor, docvqa, res
             )
 
-            rows.append({
-                "model": model_name,
-                "params_m": params_m,
-                "resolution": res,
-                "tokens": tokens,
-                "textvqa_acc": txt_acc,
-                "docvqa_acc": doc_acc,
-                "avg_latency": txt_lat,   # using TextVQA latency consistently
-            })
+            rows.append(
+                {
+                    "model": model_name,
+                    "params_m": params_m,
+                    "resolution": res,
+                    "tokens": tokens,
+                    "textvqa_acc": txt_acc,
+                    "docvqa_acc": doc_acc,
+                    "avg_latency": txt_lat,  # using TextVQA latency consistently
+                }
+            )
 
         del model, tokenizer
         torch.cuda.empty_cache()
@@ -192,44 +212,58 @@ def build_table11():
 
 # ---------------- OUTPUT (Same as Table 5) ---------------- #
 
-def print_markdown_table(rows):
-    print("\n" + "="*80)
-    print("### Table 11 (Replication) — FastVLM Model Comparison")
-    print("="*80 + "\n")
 
-    print("| Model | Params (M) | Resolution | Visual Tokens | TextVQA Acc (%) | DocVQA Acc (%) | Avg Latency (ms) |")
-    print("|-------|------------|------------|----------------|------------------|----------------|------------------|")
+def print_markdown_table(rows):
+    print("\n" + "=" * 80)
+    print("### Table 11 (Replication) — FastVLM Model Comparison")
+    print("=" * 80 + "\n")
+
+    print(
+        "| Model | Params (M) | Resolution | Visual Tokens | TextVQA Acc (%) | DocVQA Acc (%) | Avg Latency (ms) |"
+    )
+    print(
+        "|-------|------------|------------|----------------|------------------|----------------|------------------|"
+    )
 
     for r in rows:
-        textvqa = '-' if r['textvqa_acc'] is None else f"{r['textvqa_acc']:.1f}"
-        docvqa = '-' if r['docvqa_acc'] is None else f"{r['docvqa_acc']:.1f}"
-        avglat = '-' if r['avg_latency'] is None else f"{r['avg_latency']:.1f}"
+        textvqa = "-" if r["textvqa_acc"] is None else f"{r['textvqa_acc']:.1f}"
+        docvqa = "-" if r["docvqa_acc"] is None else f"{r['docvqa_acc']:.1f}"
+        avglat = "-" if r["avg_latency"] is None else f"{r['avg_latency']:.1f}"
         print(
             f"| {r['model']} | {r['params_m']:.1f} | {r['resolution']} | {r['tokens']} | {textvqa} | {docvqa} | {avglat} |"
         )
 
 
 def save_table_as_image(rows):
-    headers = ["Model", "Params (M)", "Resolution", "Visual Tokens",
-               "TextVQA Acc (%)", "DocVQA Acc (%)", "Avg Latency (ms)"]
+    headers = [
+        "Model",
+        "Params (M)",
+        "Resolution",
+        "Visual Tokens",
+        "TextVQA Acc (%)",
+        "DocVQA Acc (%)",
+        "Avg Latency (ms)",
+    ]
 
     table_rows = []
     for r in rows:
-        table_rows.append([
-            r["model"],
-            f"{r['params_m']:.1f}",
-            str(r["resolution"]),
-            str(r["tokens"]),
-            "-" if r["textvqa_acc"] is None else f"{r['textvqa_acc']:.1f}",
-            "-" if r["docvqa_acc"] is None else f"{r['docvqa_acc']:.1f}",
-            "-" if r["avg_latency"] is None else f"{r['avg_latency']:.1f}",
-        ])
+        table_rows.append(
+            [
+                r["model"],
+                f"{r['params_m']:.1f}",
+                str(r["resolution"]),
+                str(r["tokens"]),
+                "-" if r["textvqa_acc"] is None else f"{r['textvqa_acc']:.1f}",
+                "-" if r["docvqa_acc"] is None else f"{r['docvqa_acc']:.1f}",
+                "-" if r["avg_latency"] is None else f"{r['avg_latency']:.1f}",
+            ]
+        )
 
     save_table_image(
         headers,
         table_rows,
         "table11_fastvlm_comparison.png",
-        title="Table 11: FastVLM Model Comparison"
+        title="Table 11: FastVLM Model Comparison",
     )
 
 
@@ -239,4 +273,3 @@ if __name__ == "__main__":
     rows = build_table11()
     print_markdown_table(rows)
     save_table_as_image(rows)
-

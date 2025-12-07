@@ -18,7 +18,7 @@ Metrics per encoder/resolution:
 import os
 import sys
 import time
-from typing import List, Dict, Any, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import torch
 from PIL import Image
@@ -27,16 +27,20 @@ from tqdm import tqdm
 # Add parent directory to path for llava imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from llava.constants import DEFAULT_IMAGE_TOKEN, IMAGE_TOKEN_INDEX
-from llava.conversation import conv_templates
-from llava.mm_utils import get_model_name_from_path, process_images, tokenizer_image_token
-from llava.model.builder import load_pretrained_model
-from llava.utils import disable_torch_init
-
 import argparse
 
 from utils_dataset import get_benchmark_dataset
 from utils_plot import save_table_image
+
+from llava.constants import DEFAULT_IMAGE_TOKEN, IMAGE_TOKEN_INDEX
+from llava.conversation import conv_templates
+from llava.mm_utils import (
+    get_model_name_from_path,
+    process_images,
+    tokenizer_image_token,
+)
+from llava.model.builder import load_pretrained_model
+from llava.utils import disable_torch_init
 
 # ---------------- CONFIG ---------------- #
 
@@ -47,10 +51,10 @@ DEFAULT_MODEL_PATH = "../checkpoints/llava-fastvithd_0.5b_stage3"
 # Downsample factors from paper: ConvNeXt=32x, FastViT-HD=64x
 # Order matches paper Table 4
 ENCODER_CONFIGS: List[Tuple[str, str, int, int]] = [
-    ("fastvit", "FastViT-HD", 256, 64),   # 16 tokens
+    ("fastvit", "FastViT-HD", 256, 64),  # 16 tokens
     # ("convnext", "ConvNeXt-L", 320, 32),  # 100 tokens
-    ("fastvit", "FastViT-HD", 512, 64),   # 64 tokens
-    ("fastvit", "FastViT-HD", 768, 64),   # 144 tokens
+    ("fastvit", "FastViT-HD", 512, 64),  # 64 tokens
+    ("fastvit", "FastViT-HD", 768, 64),  # 144 tokens
     # ("convnext", "ConvNeXt-L", 512, 32),  # 256 tokens
     ("fastvit", "FastViT-HD", 1024, 64),  # 256 tokens
 ]
@@ -74,6 +78,7 @@ CONV_MODE = "qwen_2"
 
 
 # ---------------- ACCURACY METRICS ---------------- #
+
 
 def normalize_answer(s: str) -> str:
     """Normalize answer string for comparison."""
@@ -119,6 +124,7 @@ def exact_match_accuracy(prediction: str, ground_truths: List[str]) -> float:
 
 
 # ---------------- MODEL UTILITIES ---------------- #
+
 
 def calculate_visual_tokens(resolution: int, downsample_factor: int) -> int:
     """Calculate number of visual tokens based on resolution and downsampling."""
@@ -175,9 +181,11 @@ def run_inference(
     prompt = conv.get_prompt()
 
     # Tokenize
-    input_ids = tokenizer_image_token(
-        prompt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt"
-    ).unsqueeze(0).to(device=DEVICE)
+    input_ids = (
+        tokenizer_image_token(prompt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt")
+        .unsqueeze(0)
+        .to(device=DEVICE)
+    )
 
     # Process image
     image_tensor = process_images([image], image_processor, model.config)[0]
@@ -220,6 +228,7 @@ def run_inference(
 
 # ---------------- BENCHMARK FUNCTIONS ---------------- #
 
+
 def evaluate_on_dataset(
     model,
     tokenizer,
@@ -240,7 +249,9 @@ def evaluate_on_dataset(
         print(f"\n📚 Loading dataset: {benchmark_name} (split={split}, FULL dataset)")
     else:
         sample_limit = max_samples
-        print(f"\n📚 Loading dataset: {benchmark_name} (split={split}, max_samples={max_samples})")
+        print(
+            f"\n📚 Loading dataset: {benchmark_name} (split={split}, max_samples={max_samples})"
+        )
 
     samples = get_benchmark_dataset(benchmark_name, split, sample_limit)
     if len(samples) == 0:
@@ -362,17 +373,19 @@ def benchmark_table4() -> List[Dict[str, Any]]:
         # Average encoder latency across all datasets
         avg_latency = sum(latency_list) / len(latency_list) if latency_list else None
 
-        results.append({
-            "encoder": enc_display,
-            "resolution": resolution,
-            "tokens": tokens,
-            "latency": avg_latency,  # encoder-only latency
-            "textvqa_acc": dataset_results.get("textvqa"),
-            "pope_acc": dataset_results.get("pope"),
-            "docvqa_acc": dataset_results.get("docvqa"),
-            "seedbench_acc": dataset_results.get("seed-bench"),
-            "gqa_acc": dataset_results.get("gqa"),
-        })
+        results.append(
+            {
+                "encoder": enc_display,
+                "resolution": resolution,
+                "tokens": tokens,
+                "latency": avg_latency,  # encoder-only latency
+                "textvqa_acc": dataset_results.get("textvqa"),
+                "pope_acc": dataset_results.get("pope"),
+                "docvqa_acc": dataset_results.get("docvqa"),
+                "seedbench_acc": dataset_results.get("seed-bench"),
+                "gqa_acc": dataset_results.get("gqa"),
+            }
+        )
 
     # Clean up
     del model, tokenizer
@@ -389,8 +402,12 @@ def print_table(results: List[Dict[str, Any]]):
     print("=" * 80 + "\n")
 
     # Header: Encoder | Resolution | #Tokens | Latency | TextVQA | POPE | DocVQA | SEED-Bench | GQA
-    print("| Image Encoder | Input Res. | #Tokens | Latency (ms) | TextVQA | POPE | DocVQA | SEED-Bench | GQA |")
-    print("|---------------|------------|---------|--------------|---------|------|--------|------------|-----|")
+    print(
+        "| Image Encoder | Input Res. | #Tokens | Latency (ms) | TextVQA | POPE | DocVQA | SEED-Bench | GQA |"
+    )
+    print(
+        "|---------------|------------|---------|--------------|---------|------|--------|------------|-----|"
+    )
 
     for r in results:
         enc = r["encoder"]
@@ -400,15 +417,29 @@ def print_table(results: List[Dict[str, Any]]):
         tvqa = f"{r['textvqa_acc']:.1f}" if r.get("textvqa_acc") is not None else "-"
         pope = f"{r['pope_acc']:.1f}" if r.get("pope_acc") is not None else "-"
         dvqa = f"{r['docvqa_acc']:.1f}" if r.get("docvqa_acc") is not None else "-"
-        seed = f"{r['seedbench_acc']:.1f}" if r.get("seedbench_acc") is not None else "-"
+        seed = (
+            f"{r['seedbench_acc']:.1f}" if r.get("seedbench_acc") is not None else "-"
+        )
         gqa = f"{r['gqa_acc']:.1f}" if r.get("gqa_acc") is not None else "-"
 
-        print(f"| {enc} | {res} | {tok} | {lat} | {tvqa} | {pope} | {dvqa} | {seed} | {gqa} |")
+        print(
+            f"| {enc} | {res} | {tok} | {lat} | {tvqa} | {pope} | {dvqa} | {seed} | {gqa} |"
+        )
 
 
 def save_table_as_image(results: List[Dict[str, Any]]):
     """Save results as a LaTeX-style table image."""
-    headers = ["Image Encoder", "Input Res.", "#Tokens", "Latency (ms)", "TextVQA", "POPE", "DocVQA", "SEED-Bench", "GQA"]
+    headers = [
+        "Image Encoder",
+        "Input Res.",
+        "#Tokens",
+        "Latency (ms)",
+        "TextVQA",
+        "POPE",
+        "DocVQA",
+        "SEED-Bench",
+        "GQA",
+    ]
     rows = []
 
     for r in results:
@@ -416,20 +447,24 @@ def save_table_as_image(results: List[Dict[str, Any]]):
         tvqa = f"{r['textvqa_acc']:.1f}" if r.get("textvqa_acc") is not None else "-"
         pope = f"{r['pope_acc']:.1f}" if r.get("pope_acc") is not None else "-"
         dvqa = f"{r['docvqa_acc']:.1f}" if r.get("docvqa_acc") is not None else "-"
-        seed = f"{r['seedbench_acc']:.1f}" if r.get("seedbench_acc") is not None else "-"
+        seed = (
+            f"{r['seedbench_acc']:.1f}" if r.get("seedbench_acc") is not None else "-"
+        )
         gqa = f"{r['gqa_acc']:.1f}" if r.get("gqa_acc") is not None else "-"
 
-        rows.append([
-            r["encoder"],
-            str(r["resolution"]),
-            str(r["tokens"]),
-            lat,
-            tvqa,
-            pope,
-            dvqa,
-            seed,
-            gqa,
-        ])
+        rows.append(
+            [
+                r["encoder"],
+                str(r["resolution"]),
+                str(r["tokens"]),
+                lat,
+                tvqa,
+                pope,
+                dvqa,
+                seed,
+                gqa,
+            ]
+        )
 
     save_table_image(
         headers,

@@ -19,7 +19,6 @@ from utils_plot import save_dual_axis_plot, save_grouped_bar, save_plot
 warnings.filterwarnings("ignore")
 
 
-
 def regenerate_resolution_scaling():
     csv_path = "results/resolution_scaling_textvqa.csv"
     if not os.path.exists(csv_path):

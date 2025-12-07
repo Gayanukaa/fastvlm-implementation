@@ -9,10 +9,10 @@ The project focuses on replicating evaluation components that are possible with 
 <details>
 <summary><b>❌ Table 1 — Model Architecture Summary</b></summary>
 
-**Reason Not Replicable:**  
+**Reason Not Replicable:**
 This table contains internal model configuration details, architectural component sizes, and training design metadata. These values are not generated through inference and require direct access to the authors' internal configuration files.
 
-**Limitation:**  
+**Limitation:**
 Architectural metadata used during pretraining is not publicly available and cannot be derived from inference-only checkpoints.
 
 </details>
@@ -20,10 +20,10 @@ Architectural metadata used during pretraining is not publicly available and can
 <details>
 <summary><b>❌ Table 2 — Pretraining and Instruction-Tuning Dataset Details</b></summary>
 
-**Reason Not Replicable:**  
+**Reason Not Replicable:**
 The table lists dataset compositions and scale (millions to billions of samples). Many datasets are public only in partial form, privately curated, or filtered based on undisclosed criteria.
 
-**Limitation:**  
+**Limitation:**
 Reconstructing this dataset pipeline requires large-scale compute, storage, and dataset licensing access not available in this environment.
 
 </details>
@@ -31,13 +31,13 @@ Reconstructing this dataset pipeline requires large-scale compute, storage, and 
 <details>
 <summary><b>❌ Table 6 — Full Vision-Language Benchmark Comparisons</b></summary>
 
-**Reason Not Replicable:**  
+**Reason Not Replicable:**
 This table compares FastVLM against numerous other VLMs (LLaVA variants, Cambrian, ConvLLaVA, etc.) across many benchmarks such as TextVQA, POPE, SEED, DocVQA, and GQA.
 
-**Important Note:**  
+**Important Note:**
 Even the FastVLM authors **did not re-run all models**. Many values were **taken directly from original papers**.
 
-**Limitation:**  
+**Limitation:**
 The external baseline models are not accessible as runnable checkpoints, and evaluating them would require a multi-GPU setup (Vicuna-7B scale or larger).
 
 </details>
@@ -45,10 +45,10 @@ The external baseline models are not accessible as runnable checkpoints, and eva
 <details>
 <summary><b>❌ Table 7 — Image Corruption Robustness</b></summary>
 
-**Reason Not Replicable:**  
+**Reason Not Replicable:**
 This evaluation requires multiple models and full inference pipelines to test robustness under blur, noise, compression, occlusion, and similar transformations.
 
-**Limitation:**  
+**Limitation:**
 Only a single checkpoint (FastVLM Stage-3) is available locally. Robustness testing requires multiple comparable VLMs and the full corruption evaluation framework.
 
 </details>
@@ -56,10 +56,10 @@ Only a single checkpoint (FastVLM Stage-3) is available locally. Robustness test
 <details>
 <summary><b>❌ Table 10 — Generalization Across Diverse Benchmarks</b></summary>
 
-**Reason Not Replicable:**  
+**Reason Not Replicable:**
 This table evaluates performance across a broad range of vision-language reasoning benchmarks using multiple external VLMs.
 
-**Limitation:**  
+**Limitation:**
 The required models, evaluation scripts, and multimodal benchmarks are not accessible or runnable under the current hardware environment.
 
 </details>
@@ -67,10 +67,10 @@ The required models, evaluation scripts, and multimodal benchmarks are not acces
 <details>
 <summary><b>❌ Table 11 — Multimodal Reasoning and Alignment Evaluation</b></summary>
 
-**Reason Not Replicable:**  
+**Reason Not Replicable:**
 This table measures fine-grained alignment, reasoning, and multimodal understanding across multiple models.
 
-**Limitation:**  
+**Limitation:**
 Access to multiple tuned VLMs, proprietary datasets, and large-scale model evaluation pipelines is required, which is not feasible on available hardware.
 
 </details>
@@ -82,7 +82,7 @@ Access to multiple tuned VLMs, proprietary datasets, and large-scale model evalu
 
 **Script:** `exp_table3.py`
 
-**What It Replicates:**  
+**What It Replicates:**
 Compares encoder architectures (ViT-L/14, ConvNeXt-L, FastViT-HD) in terms of parameter count and inference latency at their respective input resolutions.
 
 **Metrics:**
@@ -106,7 +106,7 @@ Compares encoder architectures (ViT-L/14, ConvNeXt-L, FastViT-HD) in terms of pa
 
 **Script:** `exp_table4.py`
 
-**What It Replicates:**  
+**What It Replicates:**
 Evaluates multiple encoder/resolution combinations for visual token efficiency, measuring accuracy on VQA benchmarks.
 
 **Encoder Configurations:**
@@ -140,7 +140,7 @@ Evaluates multiple encoder/resolution combinations for visual token efficiency, 
 
 **Script:** `exp_table5.py`
 
-**What It Replicates:**  
+**What It Replicates:**
 Demonstrates FastViT-HD's visual token efficiency across different resolutions by resizing input images and measuring accuracy at each resolution separately.
 
 **Resolutions:** 256, 512, 768, 1024px (FastViT-HD only)
@@ -180,7 +180,7 @@ Demonstrates FastViT-HD's visual token efficiency across different resolutions b
 
 **Script:** `exp_figure5.py`
 
-**What It Replicates:**  
+**What It Replicates:**
 Measures how Vision Encoder latency and LLM Prefilling latency scale with input resolution. This replicates Figure 5 from the paper which shows a grouped bar chart comparing these two components.
 
 **Resolutions Tested:** 256, 512, 768, 1024, 1536px (matching the paper)
@@ -226,7 +226,7 @@ The number of visual tokens scales with `(resolution / 64)²` due to FastViT-HD'
 
 **Script:** `exp_stage_comparison.py --replication-target figure4`
 
-**What It Replicates:**  
+**What It Replicates:**
 Generates the Pareto curve showing the trade-off between accuracy (Avg-5 Score) and latency (TTFT). The script automatically loops through multiple resolutions (256, 512, 768, 1024) and plots them as a line graph.
 
 **Usage:**
@@ -254,7 +254,7 @@ The script automatically:
    - Y-axis: Avg-5 Score (%)
    - Annotations showing resolution at each point
 
-**Benchmarks (Avg-5 subset):** TextVQA, DocVQA  
+**Benchmarks (Avg-5 subset):** TextVQA, DocVQA
 _(Full Avg-5 in paper: TextVQA, DocVQA, ChartQA, AI2D, InfoVQA)_
 
 **Metrics:**
@@ -282,7 +282,7 @@ _(Full Avg-5 in paper: TextVQA, DocVQA, ChartQA, AI2D, InfoVQA)_
 
 **Script:** `exp_stage_comparison.py --replication-target table6`
 
-**What It Replicates:**  
+**What It Replicates:**
 Evaluates FastVLM on the Avg-5 benchmark suite used in Table 6 for comparing VLM performance.
 
 **Usage:**
@@ -314,7 +314,7 @@ python exp_stage_comparison.py --replication-target table6 --resolution 1024 --n
 
 **Script:** `exp_stage_comparison.py --replication-target table11`
 
-**What It Replicates:**  
+**What It Replicates:**
 Evaluates FastVLM on text-rich benchmarks at specific resolutions as shown in Table 11.
 
 **Usage:**
@@ -324,7 +324,7 @@ python exp_stage_comparison.py --replication-target table11 --resolution 1024 --
 python exp_stage_comparison.py --replication-target table11 --resolution 1152 --num-samples 100
 ```
 
-**Benchmarks (Text-Rich subset):** TextVQA, DocVQA  
+**Benchmarks (Text-Rich subset):** TextVQA, DocVQA
 _(Full set in paper: TextVQA, DocVQA, ChartQA, InfoVQA, OCRBench)_
 
 **Metrics:**
@@ -347,7 +347,7 @@ _(Full set in paper: TextVQA, DocVQA, ChartQA, InfoVQA, OCRBench)_
 
 **Script:** `exp_stage_comparison.py --replication-target stage-comparison`
 
-**What It Replicates:**  
+**What It Replicates:**
 Compares performance between Stage-2 (pre-training) and Stage-3 (fine-tuned) checkpoints on TextVQA.
 
 **Usage:**
@@ -380,7 +380,7 @@ python exp_stage_comparison.py --replication-target stage-comparison --stage2-pa
 
 **Script:** `exp_prompt_length_effect.py`
 
-**What It Replicates:**  
+**What It Replicates:**
 Analyzes how different prompt lengths affect Time-to-First-Token (TTFT) and total inference latency.
 
 **Prompt Categories:** Short, Medium, Long (with context prefixes)

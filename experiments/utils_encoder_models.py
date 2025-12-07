@@ -222,20 +222,18 @@
 #     print("This module provides helpers for model comparison experiments.")
 
 
-
-
-import sys
 import os
+import sys
 
 # Add parent directory to path to import llava modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-import torch
 import open_clip
+import torch
 from torchvision import transforms
 from torchvision.models import convnext_large
 
-MODEL_PATH = "encoder_models/"   # folder where .pt files are stored
+MODEL_PATH = "encoder_models/"  # folder where .pt files are stored
 
 
 def load_encoder(name, resolution=224):
@@ -257,11 +255,13 @@ def load_encoder(name, resolution=224):
         weights = torch.load(MODEL_PATH + "convnext_large.pt", map_location="cpu")
         model.load_state_dict(weights)
         # Use the specified resolution (paper uses 320 for ConvNeXt)
-        preprocess = transforms.Compose([
-            transforms.Resize(resolution + 32),  # slightly larger for crop
-            transforms.CenterCrop(resolution),
-            transforms.ToTensor()
-        ])
+        preprocess = transforms.Compose(
+            [
+                transforms.Resize(resolution + 32),  # slightly larger for crop
+                transforms.CenterCrop(resolution),
+                transforms.ToTensor(),
+            ]
+        )
         return model.eval(), preprocess
 
     elif name == "vit":
@@ -303,8 +303,8 @@ def load_encoder(name, resolution=224):
         if not weights_loaded and os.path.exists(fallback_weights_path):
             try:
                 weights = torch.load(fallback_weights_path, map_location="cpu")
-                if isinstance(weights, dict) and 'state_dict' in weights:
-                    weights = weights['state_dict']
+                if isinstance(weights, dict) and "state_dict" in weights:
+                    weights = weights["state_dict"]
                 model.load_state_dict(weights, strict=False)
                 print(f"  ✓ Loaded weights from fastvithd.pt")
                 weights_loaded = True
@@ -316,12 +316,16 @@ def load_encoder(name, resolution=224):
 
         # FastViT uses 256x256 input by default (from timm config)
         # But can also work with 224
-        preprocess = transforms.Compose([
-            transforms.Resize(resolution + 32),
-            transforms.CenterCrop(resolution),
-            transforms.ToTensor()
-        ])
+        preprocess = transforms.Compose(
+            [
+                transforms.Resize(resolution + 32),
+                transforms.CenterCrop(resolution),
+                transforms.ToTensor(),
+            ]
+        )
         return model.eval(), preprocess
 
     else:
-        raise ValueError(f"Unknown encoder name '{name}'. Use: convnext | vit | fastvit")
+        raise ValueError(
+            f"Unknown encoder name '{name}'. Use: convnext | vit | fastvit"
+        )

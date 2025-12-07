@@ -17,11 +17,10 @@ Hardware: RTX 4070 8GB (or your GPU)
 """
 
 import time
-from typing import Dict, Any, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 import torch
 from PIL import Image
-
 from utils_encoder_models import load_encoder
 from utils_plot import save_table_image
 
@@ -36,9 +35,9 @@ torch.backends.cudnn.allow_tf32 = True
 # Order matches the paper: ViT-L/14, ConvNeXt-L, FastViT-HD
 # Format: (internal_name, display_name, resolution)
 ENCODER_CONFIGS: List[Tuple[str, str, int]] = [
-    ("vit", "ViT-L/14", 224),          # Paper: 304M params, 224px, 47.2ms
-    ("convnext", "ConvNeXt-L", 320),   # Paper: 200M params, 320px, 34.4ms
-    ("fastvit", "FastViT-HD", 224),    # Paper: 125M params, 224px, 6.8ms
+    ("vit", "ViT-L/14", 224),  # Paper: 304M params, 224px, 47.2ms
+    ("convnext", "ConvNeXt-L", 320),  # Paper: 200M params, 320px, 34.4ms
+    ("fastvit", "FastViT-HD", 224),  # Paper: 125M params, 224px, 6.8ms
 ]
 
 N_WARMUP = 20
@@ -50,6 +49,7 @@ DTYPE = torch.float32
 
 
 # ---------------- UTILITIES ---------------- #
+
 
 def count_parameters(model: torch.nn.Module) -> float:
     """Return total parameters in millions (matches paper's 'Encoder Size (M)')."""
@@ -123,6 +123,7 @@ def measure_latency(
 
 
 # ---------------- MAIN BENCHMARK ---------------- #
+
 
 def benchmark() -> List[Tuple]:
     """Run benchmark and return results."""

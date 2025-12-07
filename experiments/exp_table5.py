@@ -25,7 +25,7 @@ import re
 import string
 import sys
 import time
-from typing import List, Dict, Any, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import torch
 from PIL import Image
@@ -34,17 +34,20 @@ from tqdm import tqdm
 # Add parent directory to path for llava imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from llava.constants import DEFAULT_IMAGE_TOKEN, IMAGE_TOKEN_INDEX
-from llava.conversation import conv_templates
-from llava.mm_utils import get_model_name_from_path, process_images, tokenizer_image_token
-from llava.model.builder import load_pretrained_model
-from llava.utils import disable_torch_init
-
 import argparse
 
 from utils_dataset import get_benchmark_dataset
 from utils_plot import save_table_image
 
+from llava.constants import DEFAULT_IMAGE_TOKEN, IMAGE_TOKEN_INDEX
+from llava.conversation import conv_templates
+from llava.mm_utils import (
+    get_model_name_from_path,
+    process_images,
+    tokenizer_image_token,
+)
+from llava.model.builder import load_pretrained_model
+from llava.utils import disable_torch_init
 
 # ---------------- CONFIG ---------------- #
 
@@ -71,6 +74,7 @@ N_WARMUP = 3
 
 
 # ---------------- ACCURACY METRICS ---------------- #
+
 
 def normalize_answer(s: str) -> str:
     """Normalize answer string for comparison."""
@@ -103,6 +107,7 @@ def vqa_accuracy(prediction: str, ground_truths: List[str]) -> float:
 
 
 # ---------------- MODEL UTILITIES ---------------- #
+
 
 def calculate_visual_tokens(resolution: int, downsample_factor: int) -> int:
     """Calculate number of visual tokens based on resolution and downsampling."""
@@ -164,9 +169,11 @@ def run_inference_at_resolution(
     prompt = conv.get_prompt()
 
     # Tokenize
-    input_ids = tokenizer_image_token(
-        prompt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt"
-    ).unsqueeze(0).to(device=DEVICE)
+    input_ids = (
+        tokenizer_image_token(prompt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt")
+        .unsqueeze(0)
+        .to(device=DEVICE)
+    )
 
     # Process the resized image -> tensor on DEVICE with correct dtype
     image_tensor = process_images([resized_image], image_processor, model.config)[0]
@@ -193,7 +200,7 @@ def run_inference_at_resolution(
             input_ids,
             images=image_tensor.unsqueeze(0),
             image_sizes=[resized_image.size],  # Use resized image size
-            do_sample=False,                   # Greedy decoding for consistency
+            do_sample=False,  # Greedy decoding for consistency
             max_new_tokens=64,
             use_cache=True,
         )
@@ -208,6 +215,7 @@ def run_inference_at_resolution(
 
 
 # ---------------- BENCHMARK FUNCTIONS ---------------- #
+
 
 def evaluate_at_resolution(
     model,
@@ -226,7 +234,9 @@ def evaluate_at_resolution(
           "num_samples": total,
         }
     """
-    print(f"\n   📐 Evaluating at {target_resolution}x{target_resolution} resolution...")
+    print(
+        f"\n   📐 Evaluating at {target_resolution}x{target_resolution} resolution..."
+    )
 
     if len(samples) == 0:
         print("      ⚠️ No samples for this benchmark.")
@@ -303,6 +313,7 @@ def evaluate_at_resolution(
 
 # ---------------- MAIN TABLE 5 ---------------- #
 
+
 def build_table5() -> List[Dict[str, Any]]:
     """Run Table 5 benchmark and return results."""
     rows: List[Dict[str, Any]] = []
@@ -328,9 +339,9 @@ def build_table5() -> List[Dict[str, Any]]:
 
     # Order matters: SQA, TextVQA, POPE, SeedBench
     benchmark_specs = [
-        ("sqa", "validation"),        # SQA
-        ("textvqa", "validation"),    # TextVQA
-        ("pope", "validation"),       # POPE
+        ("sqa", "validation"),  # SQA
+        ("textvqa", "validation"),  # TextVQA
+        ("pope", "validation"),  # POPE
         ("seedbench", "validation"),  # SeedBench
     ]
 
@@ -373,43 +384,41 @@ def build_table5() -> List[Dict[str, Any]]:
         if benchmark_samples.get("sqa"):
             print("\n[SQA]")
             sqa_res = evaluate_at_resolution(
-                model, tokenizer, image_processor,
-                benchmark_samples["sqa"], res
+                model, tokenizer, image_processor, benchmark_samples["sqa"], res
             )
 
         if benchmark_samples.get("textvqa"):
             print("\n[TextVQA]")
             textvqa_res = evaluate_at_resolution(
-                model, tokenizer, image_processor,
-                benchmark_samples["textvqa"], res
+                model, tokenizer, image_processor, benchmark_samples["textvqa"], res
             )
 
         if benchmark_samples.get("pope"):
             print("\n[POPE]")
             pope_res = evaluate_at_resolution(
-                model, tokenizer, image_processor,
-                benchmark_samples["pope"], res
+                model, tokenizer, image_processor, benchmark_samples["pope"], res
             )
 
         if benchmark_samples.get("seedbench"):
             print("\n[SeedBench]")
             seedbench_res = evaluate_at_resolution(
-                model, tokenizer, image_processor,
-                benchmark_samples["seedbench"], res
+                model, tokenizer, image_processor, benchmark_samples["seedbench"], res
             )
 
         # We store one latency (e.g., TextVQA full latency) for reference if needed.
-        rows.append({
-            "model": "FastViT-HD",
-            "resolution": res,
-            "tokens": tokens,
-            # accuracies in requested order: SQA, TextVQA, POPE, SeedBench
-            "sqa_acc": sqa_res.get("accuracy"),
-            "textvqa_acc": textvqa_res.get("accuracy"),
-            "pope_acc": pope_res.get("accuracy"),
-            "seedbench_acc": seedbench_res.get("accuracy"),
-            "avg_latency_ms": textvqa_res.get("avg_encoder_latency_ms"),
-        })
+        rows.append(
+            {
+                "model": "FastViT-HD",
+                "resolution": res,
+                "tokens": tokens,
+                # accuracies in requested order: SQA, TextVQA, POPE, SeedBench
+                "sqa_acc": sqa_res.get("accuracy"),
+                "textvqa_acc": textvqa_res.get("accuracy"),
+                "pope_acc": pope_res.get("accuracy"),
+                "seedbench_acc": seedbench_res.get("accuracy"),
+                "avg_latency_ms": textvqa_res.get("avg_encoder_latency_ms"),
+            }
+        )
 
     # Clean up
     del model, tokenizer
@@ -425,8 +434,12 @@ def print_markdown_table(rows: List[Dict[str, Any]]):
     print("### Table 5 (Replication)")
     print("=" * 80 + "\n")
 
-    print("| Model | Resolution | Visual Tokens | SQA Acc (%) | TextVQA Acc (%) | POPE Acc (%) | SeedBench Acc (%) |")
-    print("|-------|------------|---------------|-------------|-----------------|--------------|-------------------|")
+    print(
+        "| Model | Resolution | Visual Tokens | SQA Acc (%) | TextVQA Acc (%) | POPE Acc (%) | SeedBench Acc (%) |"
+    )
+    print(
+        "|-------|------------|---------------|-------------|-----------------|--------------|-------------------|"
+    )
 
     for r in rows:
         tok = "-" if r["tokens"] is None or r["tokens"] == -1 else str(r["tokens"])
@@ -434,7 +447,9 @@ def print_markdown_table(rows: List[Dict[str, Any]]):
         txt = "-" if r.get("textvqa_acc") is None else f"{r['textvqa_acc']:.1f}"
         pope = "-" if r.get("pope_acc") is None else f"{r['pope_acc']:.1f}"
         seed = "-" if r.get("seedbench_acc") is None else f"{r['seedbench_acc']:.1f}"
-        print(f"| {r['model']} | {r['resolution']} | {tok} | {sqa} | {txt} | {pope} | {seed} |")
+        print(
+            f"| {r['model']} | {r['resolution']} | {tok} | {sqa} | {txt} | {pope} | {seed} |"
+        )
 
 
 def save_table_as_image(rows: List[Dict[str, Any]]):
@@ -456,15 +471,17 @@ def save_table_as_image(rows: List[Dict[str, Any]]):
         txt = "-" if r.get("textvqa_acc") is None else f"{r['textvqa_acc']:.1f}"
         pope = "-" if r.get("pope_acc") is None else f"{r['pope_acc']:.1f}"
         seed = "-" if r.get("seedbench_acc") is None else f"{r['seedbench_acc']:.1f}"
-        table_rows.append([
-            r["model"],
-            str(r["resolution"]),
-            tok,
-            sqa,
-            txt,
-            pope,
-            seed,
-        ])
+        table_rows.append(
+            [
+                r["model"],
+                str(r["resolution"]),
+                tok,
+                sqa,
+                txt,
+                pope,
+                seed,
+            ]
+        )
 
     save_table_image(
         headers,

@@ -24,14 +24,13 @@ Intended for use in FastVLM evaluation scripts, quick benchmarking,
 and encoder comparison experiments.
 """
 
-import os
 import json
+import os
 from typing import Any, Dict, List, Optional
 
 from datasets import load_dataset
 from PIL import Image
 from tqdm import tqdm
-
 
 # Root cache directory for benchmark datasets
 # You can also override this via an env var if you want:
@@ -42,8 +41,6 @@ from tqdm import tqdm
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 CACHE_ROOT = os.path.join(THIS_DIR, "Benchmark_datasets")
 os.makedirs(CACHE_ROOT, exist_ok=True)
-
-
 
 
 def _get_cache_dir(benchmark_name: str) -> str:
@@ -86,12 +83,14 @@ def _load_from_cache(
 
                 img = Image.open(img_path).convert("RGB")
 
-                formatted_data.append({
-                    "id": rec["id"],
-                    "image": img,
-                    "question": rec["question"],
-                    "answers": rec["answers"],
-                })
+                formatted_data.append(
+                    {
+                        "id": rec["id"],
+                        "image": img,
+                        "question": rec["question"],
+                        "answers": rec["answers"],
+                    }
+                )
     except Exception as e:
         print(f"⚠️ Error reading cache for {benchmark_name}: {e}")
         return []
@@ -175,15 +174,21 @@ def get_benchmark_dataset(
 
     # For full dataset mode (max_samples is None), keep old behavior:
     if max_samples is None:
-        print(f"📚 Loading {benchmark_name} ({split}) - FULL dataset (no streaming, no cache)...")
+        print(
+            f"📚 Loading {benchmark_name} ({split}) - FULL dataset (no streaming, no cache)..."
+        )
         formatted_data: List[Dict[str, Any]] = []
     else:
-        print(f"📚 Loading {benchmark_name} ({split}) - Max samples: {max_samples} (streaming + cache)...")
+        print(
+            f"📚 Loading {benchmark_name} ({split}) - Max samples: {max_samples} (streaming + cache)..."
+        )
         # Try loading from cache first
         formatted_data = _load_from_cache(benchmark_name, max_samples)
         if len(formatted_data) >= sample_limit:
             # Already have enough cached samples
-            print(f"✅ Returning {len(formatted_data)} samples from cache for {benchmark_name}")
+            print(
+                f"✅ Returning {len(formatted_data)} samples from cache for {benchmark_name}"
+            )
             return formatted_data
 
     try:
@@ -202,12 +207,18 @@ def get_benchmark_dataset(
 
         # ======== TextVQA (lmms-lab) ========
         if benchmark_name == "textvqa":
-            dataset = load_dataset("lmms-lab/textvqa", split=split, streaming=use_streaming)
+            dataset = load_dataset(
+                "lmms-lab/textvqa", split=split, streaming=use_streaming
+            )
 
             iterator = enumerate(dataset)
-            pbar_total = max_samples if (use_streaming and max_samples is not None) else None
+            pbar_total = (
+                max_samples if (use_streaming and max_samples is not None) else None
+            )
 
-            for idx, sample in tqdm(iterator, total=pbar_total, desc="Processing TextVQA"):
+            for idx, sample in tqdm(
+                iterator, total=pbar_total, desc="Processing TextVQA"
+            ):
                 if has_enough_samples():
                     break
 
@@ -227,12 +238,18 @@ def get_benchmark_dataset(
         # ======== DocVQA (lmms-lab) ========
         elif benchmark_name == "docvqa":
             # lmms-lab/DocVQA requires config name: 'DocVQA' or 'InfographicVQA'
-            dataset = load_dataset("lmms-lab/DocVQA", "DocVQA", split=split, streaming=use_streaming)
+            dataset = load_dataset(
+                "lmms-lab/DocVQA", "DocVQA", split=split, streaming=use_streaming
+            )
 
             iterator = enumerate(dataset)
-            pbar_total = max_samples if (use_streaming and max_samples is not None) else None
+            pbar_total = (
+                max_samples if (use_streaming and max_samples is not None) else None
+            )
 
-            for idx, sample in tqdm(iterator, total=pbar_total, desc="Processing DocVQA"):
+            for idx, sample in tqdm(
+                iterator, total=pbar_total, desc="Processing DocVQA"
+            ):
                 if has_enough_samples():
                     break
 
@@ -276,16 +293,24 @@ def get_benchmark_dataset(
             )
 
             iterator = enumerate(dataset)
-            pbar_total = max_samples if (use_streaming and max_samples is not None) else None
+            pbar_total = (
+                max_samples if (use_streaming and max_samples is not None) else None
+            )
 
-            for idx, sample in tqdm(iterator, total=pbar_total, desc="Processing SEED-Bench"):
+            for idx, sample in tqdm(
+                iterator, total=pbar_total, desc="Processing SEED-Bench"
+            ):
                 if has_enough_samples():
                     break
 
                 imgs = sample.get("image")
                 img = None
                 # image column is a list of images; take the first if present
-                if isinstance(imgs, list) and len(imgs) > 0 and isinstance(imgs[0], Image.Image):
+                if (
+                    isinstance(imgs, list)
+                    and len(imgs) > 0
+                    and isinstance(imgs[0], Image.Image)
+                ):
                     img = imgs[0]
                 elif isinstance(imgs, Image.Image):
                     img = imgs
@@ -307,7 +332,10 @@ def get_benchmark_dataset(
                 }
 
                 answers_list: List[str] = []
-                if answer_letter in choice_map and choice_map[answer_letter] is not None:
+                if (
+                    answer_letter in choice_map
+                    and choice_map[answer_letter] is not None
+                ):
                     answers_list = [str(choice_map[answer_letter])]
 
                 sample_dict = {
@@ -337,9 +365,13 @@ def get_benchmark_dataset(
             )
 
             iterator = enumerate(dataset)
-            pbar_total = max_samples if (use_streaming and max_samples is not None) else None
+            pbar_total = (
+                max_samples if (use_streaming and max_samples is not None) else None
+            )
 
-            for idx, sample in tqdm(iterator, total=pbar_total, desc="Processing ScienceQA-IMG"):
+            for idx, sample in tqdm(
+                iterator, total=pbar_total, desc="Processing ScienceQA-IMG"
+            ):
                 if has_enough_samples():
                     break
 
@@ -386,9 +418,13 @@ def get_benchmark_dataset(
             )
 
             iterator = enumerate(dataset)
-            pbar_total = max_samples if (use_streaming and max_samples is not None) else None
+            pbar_total = (
+                max_samples if (use_streaming and max_samples is not None) else None
+            )
 
-            for idx, sample in tqdm(iterator, total=pbar_total, desc="Processing VQAv2"):
+            for idx, sample in tqdm(
+                iterator, total=pbar_total, desc="Processing VQAv2"
+            ):
                 if has_enough_samples():
                     break
 
@@ -431,7 +467,9 @@ def get_benchmark_dataset(
             )
 
             iterator = enumerate(dataset)
-            pbar_total = max_samples if (use_streaming and max_samples is not None) else None
+            pbar_total = (
+                max_samples if (use_streaming and max_samples is not None) else None
+            )
 
             for idx, sample in tqdm(iterator, total=pbar_total, desc="Processing POPE"):
                 if has_enough_samples():
@@ -478,7 +516,9 @@ def get_benchmark_dataset(
 
             # Load images first (not streaming, we need to index by id)
             print(f"   Loading GQA images ({images_config})...")
-            images_dataset = load_dataset("lmms-lab/GQA", images_config, split=actual_split)
+            images_dataset = load_dataset(
+                "lmms-lab/GQA", images_config, split=actual_split
+            )
 
             # Build image lookup dict
             image_lookup = {}
@@ -500,7 +540,9 @@ def get_benchmark_dataset(
             )
 
             iterator = enumerate(instructions_dataset)
-            pbar_total = max_samples if (use_streaming and max_samples is not None) else None
+            pbar_total = (
+                max_samples if (use_streaming and max_samples is not None) else None
+            )
 
             for idx, sample in tqdm(iterator, total=pbar_total, desc="Processing GQA"):
                 if has_enough_samples():
