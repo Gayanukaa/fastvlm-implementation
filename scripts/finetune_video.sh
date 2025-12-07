@@ -25,14 +25,14 @@ DATA_PATH="dataset/fastvlm_train.json"
 EVAL_DATA_PATH="dataset/fastvlm_val.json"
 IMAGE_FOLDER="dataset"
 OUTPUT_DIR="models/exercise-video-finetuned"
-NUM_VIDEO_FRAMES=4  # Reduced for memory efficiency on 8GB GPU
+NUM_VIDEO_FRAMES=4  # Reduced for memory efficiency
 
-# Training hyperparameters (optimized for 8GB VRAM)
-BATCH_SIZE=8
-GRAD_ACCUM_STEPS=2
+# Training hyperparameters (optimized for memory efficiency)
+BATCH_SIZE=2
+GRAD_ACCUM_STEPS=8
 LEARNING_RATE=2e-5
 NUM_EPOCHS=3
-MODEL_MAX_LENGTH=2048
+MODEL_MAX_LENGTH=1024
 WARMUP_RATIO=0.03
 
 # WandB configuration
@@ -113,6 +113,10 @@ echo "=============================================="
 # Set environment variables for better logging
 export PYTHONUNBUFFERED=1
 export TRANSFORMERS_VERBOSITY=info
+
+# CUDA memory optimization
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+export CUDA_LAUNCH_BLOCKING=0
 
 # Run training with output to both console and log file
 python -u llava/train/train_mem.py \
