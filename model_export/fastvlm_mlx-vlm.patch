@@ -13,8 +13,8 @@ index 5952a88..335e9db 100644
 +        default=False,
 +    )
      return parser
- 
- 
+
+
 diff --git a/mlx_vlm/models/fastvlm/__init__.py b/mlx_vlm/models/fastvlm/__init__.py
 new file mode 100644
 index 0000000..691192e
@@ -460,8 +460,8 @@ index 725e811..ba48296 100644
          "mllama": "message_list_with_image",
          # Models that can handle both image and video formats
 @@ -143,7 +144,7 @@ def get_message_json(
- 
- 
+
+
  def get_chat_template(processor, messages, add_generation_prompt, tokenize=False):
 -    if "chat_template" in processor.__dict__.keys():
 +    if ("chat_template" in processor.__dict__.keys()) and (processor.chat_template is not None):
@@ -487,15 +487,15 @@ index 4acff3e..00f366f 100644
  from PIL import Image, ImageOps
 @@ -31,7 +33,7 @@ from .tokenizer_utils import load_tokenizer
  from .trainer import apply_lora_layers
- 
+
  # Constants
 -MODEL_REMAPPING = {"llava-qwen2": "llava_bunny", "bunny-llama": "llava_bunny"}
 +MODEL_REMAPPING = {"llava-qwen2": "llava_bunny", "bunny-llama": "llava_bunny", "llava_qwen2": "fastvlm"}
- 
+
  MAX_FILE_SIZE_GB = 5
- 
+
 @@ -168,9 +170,19 @@ python -m mlx_vlm.convert --hf-path <local_dir> --mlx-path <mlx_dir>
- 
+
      # Sanitize weights
      weights = sanitize_weights(model, weights)
 -    weights = sanitize_weights(
@@ -520,7 +520,7 @@ index 4acff3e..00f366f 100644
 @@ -185,7 +197,21 @@ python -m mlx_vlm.convert --hf-path <local_dir> --mlx-path <mlx_dir>
              class_predicate=class_predicate,
          )
- 
+
 -    model.load_weights(list(weights.items()))
 +    if kwargs.get("only_llm", False):
 +        # Ignore vision tower weights
@@ -539,7 +539,7 @@ index 4acff3e..00f366f 100644
 +        model.load_weights(list(weights.items()))
      if not lazy:
          mx.eval(model.parameters())
- 
+
 @@ -669,11 +695,12 @@ def convert(
      dequantize: bool = False,
      skip_vision: bool = False,
@@ -552,12 +552,12 @@ index 4acff3e..00f366f 100644
 -        model_path, lazy=True, trust_remote_code=trust_remote_code
 +        model_path, lazy=True, trust_remote_code=trust_remote_code, only_llm=only_llm
      )
- 
+
      weights = dict(tree_flatten(model.parameters()))
 @@ -709,6 +736,12 @@ def convert(
- 
+
      save_config(config, config_path=mlx_path / "config.json")
- 
+
 +    # Copy over any coreml files if found
 +    coreml_files = glob.glob(str(model_path / "*.mlpackage"))
 +    for file in coreml_files:
@@ -566,4 +566,4 @@ index 4acff3e..00f366f 100644
 +
      if upload_repo is not None:
          upload_to_hub(mlx_path, upload_repo, hf_path)
- 
+

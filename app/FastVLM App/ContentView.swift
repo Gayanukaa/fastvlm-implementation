@@ -37,11 +37,11 @@ struct ContentView: View {
         #endif
         return placement
     }
-    
+
     var statusTextColor : Color {
         return model.evaluationState == .processingPrompt ? .black : .white
     }
-    
+
     var statusBackgroundColor : Color {
         switch model.evaluationState {
         case .idle:
@@ -191,7 +191,7 @@ struct ContentView: View {
                 Spacer()
                 #endif
             }
-            
+
             #if os(iOS)
             .listSectionSpacing(0)
             #elseif os(macOS)
@@ -365,7 +365,7 @@ struct ContentView: View {
                 prompt: .text("\(prompt) \(promptSuffix)"),
                 images: [.ciImage(CIImage(cvPixelBuffer: frame))]
             )
-            
+
             // generate output for a frame and wait for generation to complete
             let t = await model.generate(userInput)
             _ = await t.result
