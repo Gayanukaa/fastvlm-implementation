@@ -5,7 +5,6 @@ This is a Gradio-based interactive application for running FastVLM inference on 
 ## Features
 
 - **Fast TTFT**: Optimized for low latency time-to-first-token.
-- **Interactive Chat**: Chat with the model about images.
 - **Model Switching**: Switch between Stage 2 and Stage 3 models.
 - **Performance Metrics**: Real-time display of TTFT and TPS (Tokens Per Second).
 
@@ -13,7 +12,7 @@ This is a Gradio-based interactive application for running FastVLM inference on 
 
 - Python 3.10+
 - CUDA-enabled GPU (recommended)
-- Dependencies installed (see root `pyproject.toml` or `experiments/requirements.txt`)
+- Dependencies installed (see root `pyproject.toml` or run `setup.sh`)
 
 ## How to Run
 
