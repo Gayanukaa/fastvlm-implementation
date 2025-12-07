@@ -45,7 +45,8 @@ N_WARMUP = 20
 N_RUNS = 100  # More runs for stable measurements
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-DTYPE = torch.float16 if DEVICE == "cuda" else torch.float32
+# DTYPE = torch.float16 if DEVICE == "cuda" else torch.float32
+DTYPE = torch.float32
 
 
 # ---------------- UTILITIES ---------------- #
