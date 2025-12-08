@@ -9,7 +9,7 @@ This is the official repository of
 </p>
 
 ### Highlights
-* We introduce FastViTHD, a novel hybrid vision encoder designed to output fewer tokens and significantly reduce encoding time for high-resolution images.  
+* We introduce FastViTHD, a novel hybrid vision encoder designed to output fewer tokens and significantly reduce encoding time for high-resolution images.
 * Our smallest variant outperforms LLaVA-OneVision-0.5B with 85x faster Time-to-First-Token (TTFT) and 3.4x smaller vision encoder.
 * Our larger variants using Qwen2-7B LLM outperform recent works like Cambrian-1-8B while using a single image encoder with a 7.9x faster TTFT.
 * Demo iOS app to demonstrate the performance of our model on a mobile device.
@@ -23,9 +23,9 @@ This is the official repository of
 </table>
 
 ## Getting Started
-We use LLaVA codebase to train FastVLM variants. In order to train or finetune your own variants, 
-please follow instructions provided in [LLaVA](https://github.com/haotian-liu/LLaVA) codebase. 
-We provide instructions for running inference with our models.   
+We use LLaVA codebase to train FastVLM variants. In order to train or finetune your own variants,
+please follow instructions provided in [LLaVA](https://github.com/haotian-liu/LLaVA) codebase.
+We provide instructions for running inference with our models.
 
 ### Setup
 ```bash
@@ -59,16 +59,22 @@ python predict.py --model-path /path/to/checkpoint-dir \
                   --image-file /path/to/image.png \
                   --prompt "Describe the image."
 ```
+For example:
+```bash
+python predict.py --model-path checkpoints/llava-fastvithd_0.5b_stage3 \
+                  --image-file images/wonders.png \
+                  --prompt "Describe the image."
+```
 
 ### Inference on Apple Silicon
-To run inference on Apple Silicon, pytorch checkpoints have to be exported to format 
+To run inference on Apple Silicon, pytorch checkpoints have to be exported to format
 suitable for running on Apple Silicon, detailed instructions and code can be found [`model_export`](model_export/) subfolder.
 Please see the README there for more details.
 
-For convenience, we provide 3 models that are in Apple Silicon compatible format: [fastvlm_0.5b_stage3](https://ml-site.cdn-apple.com/datasets/fastvlm/llava-fastvithd_0.5b_stage3_llm.fp16.zip), 
-[fastvlm_1.5b_stage3](https://ml-site.cdn-apple.com/datasets/fastvlm/llava-fastvithd_1.5b_stage3_llm.int8.zip), 
-[fastvlm_7b_stage3](https://ml-site.cdn-apple.com/datasets/fastvlm/llava-fastvithd_7b_stage3_llm.int4.zip). 
-We encourage developers to export the model of their choice with the appropriate quantization levels following 
+For convenience, we provide 3 models that are in Apple Silicon compatible format: [fastvlm_0.5b_stage3](https://ml-site.cdn-apple.com/datasets/fastvlm/llava-fastvithd_0.5b_stage3_llm.fp16.zip),
+[fastvlm_1.5b_stage3](https://ml-site.cdn-apple.com/datasets/fastvlm/llava-fastvithd_1.5b_stage3_llm.int8.zip),
+[fastvlm_7b_stage3](https://ml-site.cdn-apple.com/datasets/fastvlm/llava-fastvithd_7b_stage3_llm.int4.zip).
+We encourage developers to export the model of their choice with the appropriate quantization levels following
 the instructions in [`model_export`](model_export/).
 
 ### Inference on Apple Devices
@@ -87,8 +93,10 @@ If you found this code useful, please cite the following paper:
 ```
 
 ## Acknowledgements
-Our codebase is built using multiple opensource contributions, please see [ACKNOWLEDGEMENTS](ACKNOWLEDGEMENTS) for more details. 
+Our codebase is built using multiple opensource contributions, please see [ACKNOWLEDGEMENTS](ACKNOWLEDGEMENTS) for more details.
 
 ## License
 Please check out the repository [LICENSE](LICENSE) before using the provided code and
 [LICENSE_MODEL](LICENSE_MODEL) for the released models.
+
+
