@@ -1,102 +1,121 @@
-# FastVLM: Efficient Vision Encoding for Vision Language Models
+# FastVLM: Research Implementation & Extensions
 
-This is the official repository of
-**[FastVLM: Efficient Vision Encoding for Vision Language Models](https://www.arxiv.org/abs/2412.13303). (CVPR 2025)**
+This repository contains our research implementation and extensions of **[FastVLM: Efficient Vision Encoding for Vision Language Models](https://www.arxiv.org/abs/2412.13303)** (CVPR 2025) by Apple Inc.
 
-[//]: # (![FastViTHD Performance]&#40;docs/acc_vs_latency_qwen-2.png&#41;)
-<p align="center">
-<img src="docs/acc_vs_latency_qwen-2.png" alt="Accuracy vs latency figure." width="400"/>
-</p>
+## Overview
 
-### Highlights
-* We introduce FastViTHD, a novel hybrid vision encoder designed to output fewer tokens and significantly reduce encoding time for high-resolution images.
-* Our smallest variant outperforms LLaVA-OneVision-0.5B with 85x faster Time-to-First-Token (TTFT) and 3.4x smaller vision encoder.
-* Our larger variants using Qwen2-7B LLM outperform recent works like Cambrian-1-8B while using a single image encoder with a 7.9x faster TTFT.
-* Demo iOS app to demonstrate the performance of our model on a mobile device.
+**Original FastVLM** introduces FastViTHD, a hybrid vision encoder that outputs ~100 tokens per image (vs 576 for CLIP).
 
-<table>
-<tr>
-    <td><img src="docs/fastvlm-counting.gif" alt="FastVLM - Counting"></td>
-    <td><img src="docs/fastvlm-handwriting.gif" alt="FastVLM - Handwriting"></td>
-    <td><img src="docs/fastvlm-emoji.gif" alt="FastVLM - Emoji"></td>
-</tr>
-</table>
+**Our Study:**
 
-## Getting Started
-We use LLaVA codebase to train FastVLM variants. In order to train or finetune your own variants,
-please follow instructions provided in [LLaVA](https://github.com/haotian-liu/LLaVA) codebase.
-We provide instructions for running inference with our models.
+1. **Experiment Replications** - Conduct 4 key experiments from the paper
+2. **Video Fine-tuning Adaptation** - Extended FastVLM for video-text training
+3. **Windows Inference Engine** - Real-time inference with live webcam support
 
-### Setup
+## Quick Start
+
+### Installation
+
 ```bash
 conda create -n fastvlm python=3.10
 conda activate fastvlm
 pip install -e .
 ```
 
-### Model Zoo
-For detailed information on various evaluations, please refer to our [paper](https://www.arxiv.org/abs/2412.13303).
-
-| Model        | Stage |                                            Pytorch Checkpoint (url)                                             |
-|:-------------|:-----:|:---------------------------------------------------------------------------------------------------------------:|
-| FastVLM-0.5B |   2   | [fastvlm_0.5b_stage2](https://ml-site.cdn-apple.com/datasets/fastvlm/llava-fastvithd_0.5b_stage2.zip) |
-|              |   3   | [fastvlm_0.5b_stage3](https://ml-site.cdn-apple.com/datasets/fastvlm/llava-fastvithd_0.5b_stage3.zip) |
-| FastVLM-1.5B |   2   | [fastvlm_1.5b_stage2](https://ml-site.cdn-apple.com/datasets/fastvlm/llava-fastvithd_1.5b_stage2.zip) |
-|              |   3   | [fastvlm_1.5b_stage3](https://ml-site.cdn-apple.com/datasets/fastvlm/llava-fastvithd_1.5b_stage3.zip)  |
-| FastVLM-7B   |   2   | [fastvlm_7b_stage2](https://ml-site.cdn-apple.com/datasets/fastvlm/llava-fastvithd_7b_stage2.zip)  |
-|              |   3   | [fastvlm_7b_stage3](https://ml-site.cdn-apple.com/datasets/fastvlm/llava-fastvithd_7b_stage3.zip)  |
-
-To download all the pretrained checkpoints run the command below (note that this might take some time depending on your connection so might be good to grab ☕️ while you wait).
+### Download Models
 
 ```bash
-bash get_models.sh   # Files will be downloaded to `checkpoints` directory.
+bash get_models.sh  # Downloads to checkpoints/
 ```
 
-### Usage Example
-To run inference of PyTorch checkpoint, follow the instruction below
+## 1) Experiment Replications
+
+We replicated 4 experiments from the FastVLM paper to validate the reported results.
+
+### Replicated Experiments
+
+| Experiment            | Paper Ref | Description                                  |
+| --------------------- | --------- | -------------------------------------------- |
+| Encoder Comparison    | Table 3   | ViT-L/14 vs ConvNeXt-L vs FastViT-HD latency |
+| Token Efficiency      | Table 4   | Visual tokens across encoders & resolutions  |
+| Resolution Scaling    | Table 5   | FastViT-HD @ 256-1024px                      |
+| Model Size Comparison | Table 11  | FastVLM 0.5B vs 1.5B                         |
+
+**Details:** See [`experiments/README.md`](experiments/README.md)
+
+## 2) Video Fine-tuning Extension
+
+We adapted FastVLM to support video-text pair training using sparse temporal sampling.
+
+### Key Modifications
+
+- **Video Frame Extraction**: Uniform sampling of N frames using `decord`
+- **Token Expansion**: `<image>` → `<image><image><image>...` (N times)
+- **Efficient Processing**: ~800 tokens for 8 frames vs 4,608 for CLIP-based models
+
+### Usage
+
 ```bash
-python predict.py --model-path /path/to/checkpoint-dir \
-                  --image-file /path/to/image.png \
-                  --prompt "Describe the image."
+cd scripts
+bash finetune_video.sh
 ```
-For example:
+
+**Note:** Full fine-tuning implementation available at [EdgeVLM-Labs/fastvlm-adaptation](https://github.com/EdgeVLM-Labs/fastvlm-adaptation) as it modifies core training code in `llava/`.
+
+<p align="center">
+<img src="docs/Finetune Graphs Collection.png"/>
+<br>
+<em>Training metrics from video fine-tuning showing loss convergence and performance improvements</em>
+</p>
+
+**Details:** See [`scripts/finetune.md`](scripts/finetune.md)
+
+## 3) Windows Inference Engine
+
+Interactive Gradio app with real-time webcam inference and optimized performance.
+
+<p align="center">
+<img src="docs/Windows Inference Engine.png"/>
+</p>
+
+### Features
+
+- **Dual Modes**: Chat (image upload) + Live (webcam streaming)
+- **Performance Optimizations**:
+  - Prompt caching for repeated queries
+  - Frame skipping (adjustable 1-10x)
+  - TF32 acceleration on Ampere+ GPUs
+- **Real-time Metrics**: TTFT, tokens/sec, avg/min/max latency, FPS
+
+### Run
+
 ```bash
-python predict.py --model-path checkpoints/llava-fastvithd_0.5b_stage3 \
-                  --image-file images/wonders.png \
-                  --prompt "Describe the image."
+python windows_app/app.py
 ```
 
-### Inference on Apple Silicon
-To run inference on Apple Silicon, pytorch checkpoints have to be exported to format
-suitable for running on Apple Silicon, detailed instructions and code can be found [`model_export`](model_export/) subfolder.
-Please see the README there for more details.
+**Details:** See [`windows_app/README.md`](windows_app/README.md)
 
-For convenience, we provide 3 models that are in Apple Silicon compatible format: [fastvlm_0.5b_stage3](https://ml-site.cdn-apple.com/datasets/fastvlm/llava-fastvithd_0.5b_stage3_llm.fp16.zip),
-[fastvlm_1.5b_stage3](https://ml-site.cdn-apple.com/datasets/fastvlm/llava-fastvithd_1.5b_stage3_llm.int8.zip),
-[fastvlm_7b_stage3](https://ml-site.cdn-apple.com/datasets/fastvlm/llava-fastvithd_7b_stage3_llm.int4.zip).
-We encourage developers to export the model of their choice with the appropriate quantization levels following
-the instructions in [`model_export`](model_export/).
+## License & Attribution
 
-### Inference on Apple Devices
-To run inference on Apple devices like iPhone, iPad or Mac, see [`app`](app/) subfolder for more details.
+### Original Work
 
-## Citation
-If you found this code useful, please cite the following paper:
-```
+FastVLM is developed by Apple Inc. and released under the [Apple Sample Code License](LICENSE).
+
+**Citation:**
+
+```bibtex
 @InProceedings{fastvlm2025,
-  author = {Pavan Kumar Anasosalu Vasu, Fartash Faghri, Chun-Liang Li, Cem Koc, Nate True, Albert Antony, Gokul Santhanam, James Gabriel, Peter Grasch, Oncel Tuzel, Hadi Pouransari},
+  author = {Pavan Kumar Anasosalu Vasu, Fartash Faghri, Chun-Liang Li,
+            Cem Koc, Nate True, Albert Antony, Gokul Santhanam,
+            James Gabriel, Peter Grasch, Oncel Tuzel, Hadi Pouransari},
   title = {FastVLM: Efficient Vision Encoding for Vision Language Models},
-  booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
-  month = {June},
-  year = {2025},
+  booktitle = {CVPR},
+  year = {2025}
 }
 ```
 
-## Acknowledgements
-Our codebase is built using multiple opensource contributions, please see [ACKNOWLEDGEMENTS](ACKNOWLEDGEMENTS) for more details.
+### Our Research Extensions
 
-## License
-Please check out the repository [LICENSE](LICENSE) before using the provided code and
-[LICENSE_MODEL](LICENSE_MODEL) for the released models.
+The modifications in this repository (experiment replications, video fine-tuning adaptation, and Windows inference engine) are provided for **research and educational purposes only**, in accordance with the Apple Sample Code License which permits use, modification, and redistribution for non-commercial research.
 
-
+Please refer to the [LICENSE](LICENSE) file for full terms.
